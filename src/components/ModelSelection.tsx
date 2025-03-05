@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +37,6 @@ type Algorithm = {
   tags: string[];
 };
 
-// Define algorithms for each problem type
 const classificationAlgorithms: Algorithm[] = [
   {
     id: 'logistic_regression',
@@ -264,7 +262,6 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
   
   const [hyperparams, setHyperparams] = useState<{[key: string]: any}>({});
   
-  // Set default hyperparameters when algorithm changes
   React.useEffect(() => {
     if (selectedAlgorithm) {
       const algorithm = algorithms.find(a => a.id === selectedAlgorithm);
@@ -423,7 +420,6 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
                             <RadioGroup
                               value={String(hyperparams[param])}
                               onValueChange={(value) => {
-                                // Convert to proper type (e.g., "true" to true)
                                 let parsedValue = value;
                                 if (value === "true") parsedValue = true;
                                 if (value === "false") parsedValue = false;

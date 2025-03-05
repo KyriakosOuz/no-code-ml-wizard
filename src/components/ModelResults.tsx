@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Check, Download, FileText, BarChart2, Scatter, PieChart } from "lucide-react";
+import { BarChart, Check, Download, FileText, BarChart2, LineChart, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ResponsiveContainer, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, Scatter as ReScatter, LineChart, Line, PieChart as RePieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, Scatter as ReScatter, LineChart as ReLineChart, Line, PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface ModelResultsProps {
   results: {
@@ -68,7 +67,6 @@ const ModelResults: React.FC<ModelResultsProps> = ({
     return nameMap[modelId] || modelId;
   };
   
-  // Format metrics for better display
   const formatMetric = (key: string, value: number): string => {
     if (['accuracy', 'precision', 'recall', 'f1', 'r2'].includes(key.toLowerCase())) {
       return (value * 100).toFixed(2) + '%';
@@ -78,7 +76,6 @@ const ModelResults: React.FC<ModelResultsProps> = ({
     return value.toFixed(2);
   };
   
-  // Get evaluation message based on metrics
   const getEvaluationMessage = (): string => {
     const { problemType, metrics } = results;
     
@@ -109,7 +106,6 @@ const ModelResults: React.FC<ModelResultsProps> = ({
     return "Model training complete. Evaluate the metrics to assess performance.";
   };
   
-  // Get metrics order and display names
   const getMetricsDisplayInfo = () => {
     const { problemType } = results;
     
@@ -163,7 +159,7 @@ const ModelResults: React.FC<ModelResultsProps> = ({
               <span>Feature Importance</span>
             </TabsTrigger>
             <TabsTrigger value="viz" className="flex items-center space-x-2">
-              <Scatter className="h-4 w-4" />
+              <LineChart className="h-4 w-4" />
               <span>Visualization</span>
             </TabsTrigger>
             <TabsTrigger value="export" className="flex items-center space-x-2">
