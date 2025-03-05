@@ -418,7 +418,7 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
                           
                           {config.type === 'radio' && (
                             <RadioGroup
-                              value={hyperparams[param]?.toString()}
+                              value={String(hyperparams[param])}
                               onValueChange={(value) => {
                                 let parsedValue = value;
                                 if (value === "true") parsedValue = true;
