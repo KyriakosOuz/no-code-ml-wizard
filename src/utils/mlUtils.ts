@@ -9,6 +9,9 @@ export async function processDataset(file: File): Promise<any> {
   return new Promise((resolve) => {
     // Simulate processing delay
     setTimeout(() => {
+      // Generate mock raw data
+      const rawData = generateMockRawData();
+      
       // Return mock statistics for demo purposes
       resolve({
         columns: ['age', 'income', 'education', 'occupation', 'has_loan'],
@@ -34,7 +37,8 @@ export async function processDataset(file: File): Promise<any> {
             min: 18,
             max: 72,
             mean: 38.5,
-            std: 12.3
+            std: 12.3,
+            median: 36.0
           },
           income: {
             type: 'numeric',
@@ -43,7 +47,8 @@ export async function processDataset(file: File): Promise<any> {
             min: 30000,
             max: 150000,
             mean: 68000,
-            std: 25000
+            std: 25000,
+            median: 65000
           },
           education: {
             type: 'categorical',
@@ -70,7 +75,7 @@ export async function processDataset(file: File): Promise<any> {
         shape: [1000, 5],
         target: 'has_loan',
         problemType: 'classification',
-        rawData: generateMockRawData(), // Added raw data for imputation and normalization
+        rawData: rawData,
         missingData: {
           hasMissing: true,
           missingColumns: ['income', 'occupation'],

@@ -1,13 +1,25 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Activity, BarChart, Database, ListChecks } from "lucide-react";
+import { 
+  Activity, 
+  BarChart, 
+  Database, 
+  ListChecks, 
+  Search, 
+  SlidersHorizontal,
+  Table as TableIcon,
+  ArrowDown,
+  ArrowUp
+} from "lucide-react";
 
 interface DataSummaryProps {
   data: {
@@ -25,16 +37,24 @@ interface DataSummaryProps {
         max?: number;
         mean?: number;
         std?: number;
+        median?: number;
       };
     };
     shape: [number, number];
     target?: string;
     problemType?: 'classification' | 'regression' | 'clustering';
+    rawData?: any[];
   } | null;
   isLoading: boolean;
 }
 
 const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: 'ascending' | 'descending';
+  } | null>(null);
+  
   if (isLoading) {
     return (
       <Card className="w-full animate-pulse">
@@ -50,7 +70,7 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
   }
 
   if (!data) return null;
-
+  
   // Generate type badges with appropriate colors
   const getTypeBadge = (type: string) => {
     const colorMap: Record<string, string> = {
@@ -65,6 +85,59 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
     };
     
     return colorMap[type.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  // Function to handle sorting
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  // Function to filter raw data based on search term
+  const getFilteredData = () => {
+    if (!data.rawData || !searchTerm.trim()) {
+      return data.rawData || [];
+    }
+    
+    return data.rawData.filter(row => {
+      return Object.entries(row).some(([key, value]) => {
+        if (value === null || value === undefined) return false;
+        return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+      });
+    });
+  };
+  
+  // Function to sort the dataset
+  const getSortedData = () => {
+    const filteredData = getFilteredData();
+    if (!sortConfig) return filteredData;
+    
+    return [...filteredData].sort((a, b) => {
+      if (a[sortConfig.key] === null || a[sortConfig.key] === undefined) return 1;
+      if (b[sortConfig.key] === null || b[sortConfig.key] === undefined) return -1;
+      
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+  
+  const getSortIcon = (columnName: string) => {
+    if (!sortConfig || sortConfig.key !== columnName) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? (
+      <ArrowUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1" />
+    );
   };
 
   return (
@@ -85,7 +158,7 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="preview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="preview" className="flex items-center space-x-2">
               <Database className="h-4 w-4" />
               <span>Data Preview</span>
@@ -97,6 +170,10 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
             <TabsTrigger value="columns" className="flex items-center space-x-2">
               <ListChecks className="h-4 w-4" />
               <span>Columns</span>
+            </TabsTrigger>
+            <TabsTrigger value="dataset" className="flex items-center space-x-2">
+              <TableIcon className="h-4 w-4" />
+              <span>Full Dataset</span>
             </TabsTrigger>
           </TabsList>
           
@@ -144,33 +221,57 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
                   </h3>
                   <Separator className="mb-3" />
                   
-                  <div className="grid grid-cols-4 gap-4">
-                    {Object.entries(data.summary)
-                      .filter(([_, stats]) => stats.type === 'numeric' || stats.type === 'integer' || stats.type === 'float')
-                      .map(([column, stats]) => (
-                        <Card key={column} className="overflow-hidden">
-                          <CardHeader className="p-3">
-                            <CardTitle className="text-sm">{column}</CardTitle>
-                            <Badge className={cn("text-xs", getTypeBadge(stats.type))}>
-                              {stats.type}
-                            </Badge>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0 text-xs">
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                              <div className="text-muted-foreground">Min:</div>
-                              <div className="font-medium text-right">{stats.min?.toFixed(2)}</div>
-                              <div className="text-muted-foreground">Max:</div>
-                              <div className="font-medium text-right">{stats.max?.toFixed(2)}</div>
-                              <div className="text-muted-foreground">Mean:</div>
-                              <div className="font-medium text-right">{stats.mean?.toFixed(2)}</div>
-                              <div className="text-muted-foreground">Missing:</div>
-                              <div className="font-medium text-right">{stats.missing}</div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                    }
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Column</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Min</TableHead>
+                        <TableHead>Max</TableHead>
+                        <TableHead>Mean</TableHead>
+                        <TableHead>Std Dev</TableHead>
+                        <TableHead>Median</TableHead>
+                        <TableHead>Missing</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(data.summary)
+                        .filter(([_, stats]) => stats.type === 'numeric' || stats.type === 'integer' || stats.type === 'float')
+                        .map(([column, stats]) => (
+                          <TableRow key={column} className={cn(
+                            column === data.target ? "bg-primary/5" : ""
+                          )}>
+                            <TableCell className="font-medium">
+                              {column}
+                              {column === data.target && (
+                                <Badge variant="outline" className="ml-2">Target</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-xs", getTypeBadge(stats.type))}>
+                                {stats.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{stats.min?.toFixed(2)}</TableCell>
+                            <TableCell>{stats.max?.toFixed(2)}</TableCell>
+                            <TableCell>{stats.mean?.toFixed(2)}</TableCell>
+                            <TableCell>{stats.std?.toFixed(2)}</TableCell>
+                            <TableCell>{stats.median?.toFixed(2) || 'N/A'}</TableCell>
+                            <TableCell>
+                              {stats.missing === 0 ? (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  0
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                  {stats.missing} ({((stats.missing / stats.count) * 100).toFixed(1)}%)
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
                 
                 <div>
@@ -180,33 +281,53 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
                   </h3>
                   <Separator className="mb-3" />
                   
-                  <div className="grid grid-cols-4 gap-4">
-                    {Object.entries(data.summary)
-                      .filter(([_, stats]) => stats.type === 'categorical' || stats.type === 'boolean' || stats.type === 'object')
-                      .map(([column, stats]) => (
-                        <Card key={column} className="overflow-hidden">
-                          <CardHeader className="p-3">
-                            <CardTitle className="text-sm">{column}</CardTitle>
-                            <Badge className={cn("text-xs", getTypeBadge(stats.type))}>
-                              {stats.type}
-                            </Badge>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0 text-xs">
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                              <div className="text-muted-foreground">Unique:</div>
-                              <div className="font-medium text-right">{stats.unique}</div>
-                              <div className="text-muted-foreground">Top value:</div>
-                              <div className="font-medium text-right truncate max-w-[100px]" title={stats.top}>
-                                {stats.top}
-                              </div>
-                              <div className="text-muted-foreground">Missing:</div>
-                              <div className="font-medium text-right">{stats.missing}</div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                    }
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Column</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Unique Values</TableHead>
+                        <TableHead>Most Frequent</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Missing</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(data.summary)
+                        .filter(([_, stats]) => stats.type === 'categorical' || stats.type === 'boolean' || stats.type === 'object')
+                        .map(([column, stats]) => (
+                          <TableRow key={column} className={cn(
+                            column === data.target ? "bg-primary/5" : ""
+                          )}>
+                            <TableCell className="font-medium">
+                              {column}
+                              {column === data.target && (
+                                <Badge variant="outline" className="ml-2">Target</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-xs", getTypeBadge(stats.type))}>
+                                {stats.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{stats.unique || 'N/A'}</TableCell>
+                            <TableCell>{stats.top || 'N/A'}</TableCell>
+                            <TableCell>{stats.top || 'N/A'}</TableCell>
+                            <TableCell>
+                              {stats.missing === 0 ? (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  0
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                  {stats.missing} ({((stats.missing / stats.count) * 100).toFixed(1)}%)
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </ScrollArea>
@@ -266,6 +387,75 @@ const DataSummary: React.FC<DataSummaryProps> = ({ data, isLoading }) => {
                 </TableBody>
               </Table>
             </ScrollArea>
+          </TabsContent>
+          
+          <TabsContent value="dataset" className="animate-fade-in">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search dataset..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+                {searchTerm && (
+                  <Button variant="ghost" size="sm" onClick={() => setSearchTerm('')}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              
+              <ScrollArea className="h-[250px] w-full rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {data.columns.map((column) => (
+                        <TableHead 
+                          key={column}
+                          className={cn(
+                            "cursor-pointer hover:bg-muted/50 select-none",
+                            column === data.target ? "bg-primary/10 font-semibold" : ""
+                          )}
+                          onClick={() => requestSort(column)}
+                        >
+                          <div className="flex items-center">
+                            {column}
+                            {getSortIcon(column)}
+                            {column === data.target && (
+                              <Badge variant="outline" className="ml-2 px-1">Target</Badge>
+                            )}
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getSortedData().map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {data.columns.map((column) => (
+                          <TableCell key={`${rowIndex}-${column}`} className={cn(
+                            column === data.target ? "bg-primary/5 font-medium" : "",
+                            searchTerm && row[column] !== null && 
+                            String(row[column]).toLowerCase().includes(searchTerm.toLowerCase()) ? 
+                            "bg-yellow-50 dark:bg-yellow-900/20" : ""
+                          )}>
+                            {row[column] === null || row[column] === undefined ? 
+                              <span className="text-muted-foreground italic">null</span> : 
+                              String(row[column])}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+              
+              <div className="text-xs text-muted-foreground">
+                Showing {getSortedData().length} of {data.rawData?.length || 0} rows
+                {searchTerm && ` (filtered by "${searchTerm}")`}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
