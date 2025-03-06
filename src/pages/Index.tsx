@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowRight, FileText, BrainCircuit, Activity, Database, SlidersHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 import Header from "@/components/Header";
 import FileUpload from "@/components/FileUpload";
@@ -16,7 +18,9 @@ import ModelResults from "@/components/ModelResults";
 import { processDataset, trainModel, exportModel, generateReport } from "@/utils/mlUtils";
 
 const Index = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<
     'upload' | 'data' | 'preprocess' | 'model' | 'results'
   >('upload');
@@ -29,6 +33,7 @@ const Index = () => {
   const [modelHyperparams, setModelHyperparams] = useState<any | null>(null);
   const [isTrainingModel, setIsTrainingModel] = useState(false);
   const [modelResults, setModelResults] = useState<any | null>(null);
+  const [savedDatasetId, setSavedDatasetId] = useState<string | null>(null);
   
   // Handle file upload
   const handleFileUpload = async (file: File) => {
@@ -58,11 +63,47 @@ const Index = () => {
     }
   };
   
+  // Save dataset to Supabase
+  const saveDatasetToSupabase = async () => {
+    if (!user || !datasetInfo || !datasetFile) return null;
+    
+    try {
+      // First check if we already saved this dataset
+      if (savedDatasetId) return savedDatasetId;
+      
+      // Save dataset metadata to Supabase
+      const { data, error } = await supabase
+        .from('datasets')
+        .insert({
+          user_id: user.id,
+          name: datasetFile.name,
+          description: `Uploaded on ${new Date().toLocaleDateString()}`,
+          columns: datasetInfo.columns,
+          shape: datasetInfo.shape,
+          problem_type: datasetInfo.problemType || 'unknown'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Store the dataset ID for later use
+      setSavedDatasetId(data.id);
+      return data.id;
+    } catch (error: any) {
+      console.error("Error saving dataset:", error);
+      return null;
+    }
+  };
+  
   // Handle model selection
   const handleModelSelect = async (model: string, hyperparams: any) => {
     setSelectedModel(model);
     setModelHyperparams(hyperparams);
     setIsTrainingModel(true);
+    
+    // First save the dataset if not already saved
+    const datasetId = await saveDatasetToSupabase();
     
     toast({
       title: "Training model",
@@ -72,6 +113,21 @@ const Index = () => {
     try {
       const results = await trainModel(datasetInfo, model, hyperparams);
       setModelResults(results);
+      
+      // Save the model to Supabase if user is logged in
+      if (user && datasetId) {
+        await supabase
+          .from('models')
+          .insert({
+            user_id: user.id,
+            dataset_id: datasetId,
+            name: `${model} for ${datasetFile?.name || 'Dataset'}`,
+            model_type: model,
+            hyperparams: hyperparams,
+            metrics: results.metrics
+          });
+      }
+      
       toast({
         title: "Model trained successfully",
         description: getProblemTypeSuccessMessage(datasetInfo?.problemType, results),
@@ -269,19 +325,29 @@ const Index = () => {
                 Back to Model Selection
               </Button>
               
-              <Button 
-                onClick={() => {
-                  setDatasetFile(null);
-                  setDatasetInfo(null);
-                  setSelectedModel(null);
-                  setModelHyperparams(null);
-                  setModelResults(null);
-                  setCurrentStep('upload');
-                }}
-                variant="default"
-              >
-                Start New Project
-              </Button>
+              <div className="space-x-2">
+                <Button 
+                  onClick={() => navigate('/dashboard')}
+                  variant="outline"
+                >
+                  View Dashboard
+                </Button>
+                
+                <Button 
+                  onClick={() => {
+                    setDatasetFile(null);
+                    setDatasetInfo(null);
+                    setSavedDatasetId(null);
+                    setSelectedModel(null);
+                    setModelHyperparams(null);
+                    setModelResults(null);
+                    setCurrentStep('upload');
+                  }}
+                  variant="default"
+                >
+                  Start New Project
+                </Button>
+              </div>
             </div>
           </motion.div>
         );

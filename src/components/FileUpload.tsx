@@ -1,10 +1,14 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Check, FileText, Upload, X } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -12,6 +16,9 @@ interface FileUploadProps {
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,10 +71,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) =
     }
   };
   
-  const handleSubmit = () => {
-    if (file) {
-      onFileUpload(file);
+  const handleSubmit = async () => {
+    if (!file) return;
+    
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload and process datasets",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
     }
+    
+    // Process the file first
+    onFileUpload(file);
   };
   
   const clearFile = () => {

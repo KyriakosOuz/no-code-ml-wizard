@@ -9,7 +9,104 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      datasets: {
+        Row: {
+          columns: Json | null
+          created_at: string
+          description: string | null
+          file_path: string | null
+          id: string
+          name: string
+          problem_type: string | null
+          shape: Json | null
+          user_id: string
+        }
+        Insert: {
+          columns?: Json | null
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          name: string
+          problem_type?: string | null
+          shape?: Json | null
+          user_id: string
+        }
+        Update: {
+          columns?: Json | null
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          name?: string
+          problem_type?: string | null
+          shape?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      models: {
+        Row: {
+          created_at: string
+          dataset_id: string
+          hyperparams: Json | null
+          id: string
+          metrics: Json | null
+          model_type: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dataset_id: string
+          hyperparams?: Json | null
+          id?: string
+          metrics?: Json | null
+          model_type: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dataset_id?: string
+          hyperparams?: Json | null
+          id?: string
+          metrics?: Json | null
+          model_type?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "models_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,24 +1,59 @@
 
 import React from 'react';
-import { cn } from "@/lib/utils";
-import { BrainCircuit } from "lucide-react";
+import { useNavigate, Link } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { useAuth } from '@/contexts/AuthContext';
+import { Database, BrainCircuit, LogIn, User, LayoutDashboard } from 'lucide-react';
 
-interface HeaderProps {
-  className?: string;
-}
-
-const Header: React.FC<HeaderProps> = ({ className }) => {
+const Header = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
   return (
-    <header className={cn("w-full px-4 py-4 border-b", className)}>
-      <div className="container max-w-7xl mx-auto flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary/10">
-            <BrainCircuit className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-medium tracking-tight">NoCode ML</h1>
-            <p className="text-xs text-muted-foreground">Automated Machine Learning Platform</p>
-          </div>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
+      <div className="container flex h-16 items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center space-x-2">
+            <BrainCircuit className="h-6 w-6" />
+            <span className="hidden font-bold sm:inline-block">
+              ML Platform
+            </span>
+          </Link>
+          
+          <nav className="hidden md:flex items-center gap-6 ml-6">
+            <Link to="/" className="text-sm font-medium transition-colors hover:text-primary">
+              Home
+            </Link>
+            {user && (
+              <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
+                Dashboard
+              </Link>
+            )}
+          </nav>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {user ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/dashboard')}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/auth')}
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In
+            </Button>
+          )}
         </div>
       </div>
     </header>
