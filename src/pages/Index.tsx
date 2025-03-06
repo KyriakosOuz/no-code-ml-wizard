@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowRight, FileText, BrainCircuit, Activity, Database } from "lucide-react";
+import { ArrowRight, FileText, BrainCircuit, Activity, Database, SlidersHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import Header from "@/components/Header";
 import FileUpload from "@/components/FileUpload";
 import DataSummary from "@/components/DataSummary";
+import DataPreprocessing from "@/components/DataPreprocessing";
 import ModelSelection from "@/components/ModelSelection";
 import ModelResults from "@/components/ModelResults";
 import { processDataset, trainModel, exportModel, generateReport } from "@/utils/mlUtils";
@@ -17,7 +18,7 @@ import { processDataset, trainModel, exportModel, generateReport } from "@/utils
 const Index = () => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<
-    'upload' | 'data' | 'model' | 'results'
+    'upload' | 'data' | 'preprocess' | 'model' | 'results'
   >('upload');
   
   const [datasetFile, setDatasetFile] = useState<File | null>(null);
@@ -99,6 +100,11 @@ const Index = () => {
     return "Model training completed successfully.";
   };
   
+  // Handle data updates from preprocessing
+  const handleDataUpdate = (updatedData: any) => {
+    setDatasetInfo(updatedData);
+  };
+  
   // Handle export model
   const handleExportModel = () => {
     if (!modelResults) return;
@@ -170,6 +176,39 @@ const Index = () => {
             
             <div className="flex justify-end">
               <Button 
+                onClick={() => setCurrentStep('preprocess')}
+                disabled={!datasetInfo}
+                className="flex items-center space-x-2"
+              >
+                <span>Preprocess Data</span>
+                <ArrowRight size={16} />
+              </Button>
+            </div>
+          </motion.div>
+        );
+      case 'preprocess':
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+          >
+            <DataPreprocessing
+              data={datasetInfo}
+              onDataUpdate={handleDataUpdate}
+              isProcessing={isProcessingData}
+            />
+            
+            <div className="flex justify-between">
+              <Button 
+                variant="outline"
+                onClick={() => setCurrentStep('data')}
+              >
+                Back to Data Summary
+              </Button>
+              <Button 
                 onClick={() => setCurrentStep('model')}
                 disabled={!datasetInfo}
                 className="flex items-center space-x-2"
@@ -199,9 +238,9 @@ const Index = () => {
             <div className="flex justify-between">
               <Button 
                 variant="outline"
-                onClick={() => setCurrentStep('data')}
+                onClick={() => setCurrentStep('preprocess')}
               >
-                Back to Data
+                Back to Preprocessing
               </Button>
             </div>
           </motion.div>
@@ -259,7 +298,7 @@ const Index = () => {
         {/* Steps Progress */}
         <div className="mb-12">
           <Tabs value={currentStep} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger 
                 value="upload" 
                 onClick={() => currentStep !== 'upload' && datasetFile && setCurrentStep('upload')}
@@ -282,6 +321,18 @@ const Index = () => {
                   <Database size={16} />
                 </div>
                 <span>Data</span>
+              </TabsTrigger>
+              
+              <TabsTrigger 
+                value="preprocess" 
+                onClick={() => datasetInfo && setCurrentStep('preprocess')}
+                disabled={!datasetInfo || isProcessingData || isTrainingModel}
+                className="flex items-center space-x-2 h-14"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'preprocess' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  <SlidersHorizontal size={16} />
+                </div>
+                <span>Preprocess</span>
               </TabsTrigger>
               
               <TabsTrigger 
