@@ -273,6 +273,7 @@ const Index = () => {
               onSelectModel={handleModelSelect}
               autoSelectRecommended={true}
               isProcessing={isTrainingModel}
+              datasetInfo={datasetInfo}
             />
             
             <div className="flex justify-between">

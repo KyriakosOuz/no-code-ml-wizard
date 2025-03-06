@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -8,14 +9,27 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Layers, Cog, BrainCircuit, BarChart, Activity } from "lucide-react";
+import { Check, Layers, Cog, BrainCircuit, BarChart, Activity, Cpu, Award, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
+import { 
+  Table, 
+  TableBody, 
+  TableCaption, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { benchmarkModels } from "@/utils/mlUtils";
 
 interface ModelSelectionProps {
   problemType: 'classification' | 'regression' | 'clustering' | null;
   onSelectModel: (model: string, hyperparams: any) => void;
   autoSelectRecommended?: boolean;
   isProcessing: boolean;
+  datasetInfo: any | null;
 }
 
 type Algorithm = {
@@ -247,6 +261,7 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
   onSelectModel, 
   autoSelectRecommended = false,
   isProcessing,
+  datasetInfo
 }) => {
   const algorithms = 
     problemType === 'classification' ? classificationAlgorithms :
@@ -261,8 +276,13 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
   );
   
   const [hyperparams, setHyperparams] = useState<{[key: string]: any}>({});
+  const [activeTab, setActiveTab] = useState('select');
+  const [enableBenchmarking, setEnableBenchmarking] = useState(true);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [benchmarkResults, setBenchmarkResults] = useState<any>(null);
+  const [recommendedModel, setRecommendedModel] = useState<string | null>(null);
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedAlgorithm) {
       const algorithm = algorithms.find(a => a.id === selectedAlgorithm);
       if (algorithm) {
@@ -277,6 +297,12 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
       }
     }
   }, [selectedAlgorithm, algorithms]);
+
+  useEffect(() => {
+    // Reset benchmark results when problem type changes
+    setBenchmarkResults(null);
+    setRecommendedModel(null);
+  }, [problemType]);
   
   const handleHyperparamChange = (param: string, value: any) => {
     setHyperparams(prev => ({
@@ -290,7 +316,62 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
       onSelectModel(selectedAlgorithm, hyperparams);
     }
   };
+
+  const runBenchmark = async () => {
+    if (!datasetInfo || !problemType || problemType !== 'classification') return;
+    
+    setIsBenchmarking(true);
+    try {
+      const results = await benchmarkModels(datasetInfo);
+      setBenchmarkResults(results);
+      
+      // Find the recommended model based on the highest accuracy
+      let bestScore = 0;
+      let bestModel = null;
+      
+      for (const model of results) {
+        if (model.metrics.accuracy > bestScore) {
+          bestScore = model.metrics.accuracy;
+          bestModel = model.id;
+        }
+      }
+      
+      setRecommendedModel(bestModel);
+      
+      // Auto-select the recommended model if enabled
+      if (autoSelectRecommended && bestModel) {
+        setSelectedAlgorithm(bestModel);
+        const algorithm = algorithms.find(a => a.id === bestModel);
+        if (algorithm) {
+          const defaultParams = Object.entries(algorithm.hyperparams).reduce(
+            (acc, [key, config]) => ({
+              ...acc,
+              [key]: config.default,
+            }),
+            {}
+          );
+          setHyperparams(defaultParams);
+        }
+      }
+    } catch (error) {
+      console.error("Error running benchmarks:", error);
+    } finally {
+      setIsBenchmarking(false);
+    }
+  };
   
+  useEffect(() => {
+    // Run benchmark automatically when the component mounts if problemType is classification
+    if (enableBenchmarking && datasetInfo && problemType === 'classification' && !benchmarkResults && !isBenchmarking) {
+      runBenchmark();
+    }
+  }, [datasetInfo, problemType, enableBenchmarking, benchmarkResults, isBenchmarking]);
+  
+  const getModelDisplayName = (modelId: string) => {
+    const algorithm = algorithms.find(a => a.id === modelId);
+    return algorithm ? algorithm.name : modelId;
+  };
+
   if (!problemType) return null;
   
   return (
@@ -305,7 +386,106 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="select">
+        {problemType === 'classification' && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                <Cpu className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-medium">Auto-Benchmark Models</h3>
+              </div>
+              <Switch 
+                checked={enableBenchmarking} 
+                onCheckedChange={setEnableBenchmarking}
+                disabled={isBenchmarking || isProcessing}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Automatically evaluate all models to find the best performer for your dataset
+            </p>
+          </div>
+        )}
+        
+        {isBenchmarking && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg flex flex-col items-center justify-center space-y-3">
+            <Spinner size="md" />
+            <p className="text-sm text-center">
+              Benchmarking models to find the best fit for your data...<br/>
+              <span className="text-xs text-muted-foreground">This may take a moment</span>
+            </p>
+          </div>
+        )}
+
+        {benchmarkResults && problemType === 'classification' && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-2 mb-2">
+              <Award className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">Benchmark Results</h3>
+            </div>
+            
+            <Table>
+              <TableCaption>Performance comparison across models</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="text-right">Accuracy</TableHead>
+                  <TableHead className="text-right">F1 Score</TableHead>
+                  <TableHead className="text-right">Training Time</TableHead>
+                  <TableHead className="text-center">Recommended</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {benchmarkResults.map((result: any) => (
+                  <TableRow 
+                    key={result.id}
+                    className={cn(
+                      result.id === recommendedModel ? "bg-primary/5" : "",
+                      "cursor-pointer hover:bg-muted/60"
+                    )}
+                    onClick={() => setSelectedAlgorithm(result.id)}
+                  >
+                    <TableCell className="font-medium">{getModelDisplayName(result.id)}</TableCell>
+                    <TableCell className="text-right">{(result.metrics.accuracy * 100).toFixed(1)}%</TableCell>
+                    <TableCell className="text-right">{(result.metrics.f1 * 100).toFixed(1)}%</TableCell>
+                    <TableCell className="text-right flex items-center justify-end">
+                      <Clock className="h-3 w-3 mr-1 opacity-70" />
+                      {result.trainingTime}s
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {result.id === recommendedModel ? (
+                        <Badge className="bg-green-500">
+                          <Check className="h-3 w-3 mr-1" /> Best
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {recommendedModel && (
+              <div className="mt-4 p-3 bg-primary/10 rounded-lg text-sm">
+                <div className="flex">
+                  <div className="mr-2 mt-0.5">
+                    <Award className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Recommendation:</p>
+                    <p className="text-muted-foreground">
+                      Based on your dataset, {getModelDisplayName(recommendedModel)} performed best with 
+                      {' '}{(benchmarkResults.find((r: any) => r.id === recommendedModel)?.metrics.accuracy * 100).toFixed(1)}% accuracy.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <Tabs 
+          defaultValue="select" 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+        >
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="select" className="flex items-center space-x-2">
               <BrainCircuit className="h-4 w-4" />
@@ -328,7 +508,8 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
                   key={algorithm.id}
                   className={cn(
                     "flex flex-col rounded-lg border p-4 transition-all duration-200 hover:shadow-md cursor-pointer",
-                    selectedAlgorithm === algorithm.id ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:bg-muted/40"
+                    selectedAlgorithm === algorithm.id ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:bg-muted/40",
+                    algorithm.id === recommendedModel ? "border-green-500" : ""
                   )}
                   onClick={() => setSelectedAlgorithm(algorithm.id)}
                 >
@@ -345,7 +526,14 @@ const ModelSelection: React.FC<ModelSelectionProps> = ({
                         )}
                       </div>
                       <div>
-                        <h3 className="font-medium text-lg">{algorithm.name}</h3>
+                        <h3 className="font-medium text-lg flex items-center">
+                          {algorithm.name}
+                          {algorithm.id === recommendedModel && (
+                            <Badge variant="outline" className="ml-2 border-green-500 text-green-600">
+                              <Award className="h-3 w-3 mr-1" /> Recommended
+                            </Badge>
+                          )}
+                        </h3>
                         <p className="text-sm text-muted-foreground">{algorithm.description}</p>
                       </div>
                     </div>

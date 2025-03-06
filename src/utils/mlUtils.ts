@@ -1,4 +1,3 @@
-
 // This is a mock implementation of ML functionality
 // In a real implementation, these would connect to a backend service
 
@@ -326,6 +325,52 @@ export async function normalizeData(
       
       resolve(updatedDatasetInfo);
     }, 1500);
+  });
+}
+
+/**
+ * Benchmark multiple machine learning models and return comparison results
+ */
+export async function benchmarkModels(datasetInfo: any): Promise<any[]> {
+  return new Promise((resolve) => {
+    // Simulate benchmarking delay (would connect to backend in real app)
+    setTimeout(() => {
+      // Models to benchmark with different configurations
+      const modelResults = [
+        {
+          id: 'logistic_regression',
+          metrics: {
+            accuracy: 0.84,
+            precision: 0.83,
+            recall: 0.85,
+            f1: 0.84
+          },
+          trainingTime: 0.2
+        },
+        {
+          id: 'random_forest',
+          metrics: {
+            accuracy: 0.91,
+            precision: 0.92,
+            recall: 0.90,
+            f1: 0.91
+          },
+          trainingTime: 1.4
+        },
+        {
+          id: 'xgboost',
+          metrics: {
+            accuracy: 0.89,
+            precision: 0.88,
+            recall: 0.90,
+            f1: 0.89
+          },
+          trainingTime: 2.1
+        }
+      ];
+      
+      resolve(modelResults);
+    }, 3000); // Simulate benchmarking time
   });
 }
 
