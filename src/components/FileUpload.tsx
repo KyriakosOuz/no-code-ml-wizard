@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) =
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -85,8 +85,45 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) =
       return;
     }
     
-    // Process the file first
-    onFileUpload(file);
+    setIsUploading(true);
+    
+    try {
+      // First upload file to Supabase storage
+      const filePath = `${user.id}/${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('datasets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('datasets')
+        .getPublicUrl(filePath);
+        
+      // Now process the file
+      onFileUpload(file);
+      
+      toast({
+        title: "File uploaded successfully",
+        description: "Your dataset has been uploaded to your account",
+      });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "There was an error uploading your file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   const clearFile = () => {
@@ -98,7 +135,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) =
     <Card className={cn(
       "w-full max-w-3xl mx-auto transition-all duration-300",
       dragActive ? "ring-2 ring-primary/50" : "",
-      isProcessing ? "opacity-50 pointer-events-none" : ""
+      isProcessing || isUploading ? "opacity-50 pointer-events-none" : ""
     )}>
       <CardHeader>
         <CardTitle className="text-2xl font-medium">Upload Your Dataset</CardTitle>
@@ -179,15 +216,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing }) =
         <Button
           variant="default"
           size="lg"
-          disabled={!file || !!error || isProcessing}
+          disabled={!file || !!error || isProcessing || isUploading}
           onClick={handleSubmit}
           className={cn(
             "transition-all duration-300",
             file && !error ? "animate-slide-up" : "opacity-0"
           )}
         >
-          <Check size={16} className="mr-2" />
-          Process Dataset
+          {isUploading ? (
+            <>
+              <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Check size={16} className="mr-2" />
+              Process Dataset
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>

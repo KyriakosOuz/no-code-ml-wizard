@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Database, FileText, BrainCircuit, Plus, Settings, LogOut, Trash2 } from "lucide-react";
+import { Database, FileText, BrainCircuit, Plus, Settings, LogOut, Trash2, Eye } from "lucide-react";
 import Header from '@/components/Header';
 
 interface Dataset {
@@ -17,6 +17,7 @@ interface Dataset {
   description: string | null;
   created_at: string;
   problem_type: string | null;
+  shape: any;
 }
 
 interface Model {
@@ -54,6 +55,7 @@ const Dashboard = () => {
       const { data: datasetsData, error: datasetsError } = await supabase
         .from('datasets')
         .select('*')
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
       
       if (datasetsError) throw datasetsError;
@@ -61,7 +63,8 @@ const Dashboard = () => {
       // Fetch user's models
       const { data: modelsData, error: modelsError } = await supabase
         .from('models')
-        .select('*, datasets:dataset_id(name)')
+        .select('*, datasets(name)')
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
       
       if (modelsError) throw modelsError;
@@ -87,6 +90,23 @@ const Dashboard = () => {
   
   const handleDeleteDataset = async (id: string) => {
     try {
+      // First find the dataset to get the file path
+      const dataset = datasets.find(d => d.id === id);
+      
+      if (dataset) {
+        // Delete the file from storage if there's a file path
+        if (dataset.file_path) {
+          const { error: storageError } = await supabase.storage
+            .from('datasets')
+            .remove([dataset.file_path]);
+            
+          if (storageError) {
+            console.error("Error removing file:", storageError);
+          }
+        }
+      }
+      
+      // Now delete the dataset record
       const { error } = await supabase
         .from('datasets')
         .delete()
@@ -94,11 +114,15 @@ const Dashboard = () => {
       
       if (error) throw error;
       
+      // Update the datasets state
       setDatasets(datasets.filter(dataset => dataset.id !== id));
+      
+      // Also filter out any models that used this dataset
+      setModels(models.filter(model => model.dataset_id !== id));
       
       toast({
         title: "Dataset deleted",
-        description: "The dataset has been successfully deleted",
+        description: "The dataset and associated models have been deleted",
       });
     } catch (error: any) {
       toast({
@@ -144,6 +168,25 @@ const Dashboard = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+  
+  const getDatasetSize = (shape: any) => {
+    if (!shape || !Array.isArray(shape) || shape.length < 2) return 'Unknown';
+    return `${shape[0]} rows × ${shape[1]} columns`;
+  };
+  
+  const getModelPerformanceLabel = (model: Model) => {
+    if (!model.metrics) return 'No metrics available';
+    
+    if (model.metrics.accuracy !== undefined) {
+      return `Accuracy: ${(model.metrics.accuracy * 100).toFixed(2)}%`;
+    } else if (model.metrics.r2 !== undefined) {
+      return `R² Score: ${(model.metrics.r2 * 100).toFixed(2)}%`;
+    } else if (model.metrics.silhouette_score !== undefined) {
+      return `Silhouette Score: ${model.metrics.silhouette_score.toFixed(3)}`;
+    }
+    
+    return 'Metrics available';
   };
   
   return (
@@ -198,6 +241,7 @@ const Dashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Size</TableHead>
                       <TableHead>Problem Type</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -207,6 +251,7 @@ const Dashboard = () => {
                     {datasets.map((dataset) => (
                       <TableRow key={dataset.id}>
                         <TableCell className="font-medium">{dataset.name}</TableCell>
+                        <TableCell>{getDatasetSize(dataset.shape)}</TableCell>
                         <TableCell>{dataset.problem_type || 'Unknown'}</TableCell>
                         <TableCell>{formatDate(dataset.created_at)}</TableCell>
                         <TableCell className="text-right">
@@ -216,7 +261,7 @@ const Dashboard = () => {
                               size="sm"
                               onClick={() => navigate(`/dataset/${dataset.id}`)}
                             >
-                              <FileText className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                               <span className="sr-only">View</span>
                             </Button>
                             <Button
@@ -266,6 +311,7 @@ const Dashboard = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Dataset</TableHead>
                       <TableHead>Model Type</TableHead>
+                      <TableHead>Performance</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -276,6 +322,7 @@ const Dashboard = () => {
                         <TableCell className="font-medium">{model.name}</TableCell>
                         <TableCell>{model.dataset_name}</TableCell>
                         <TableCell>{model.model_type}</TableCell>
+                        <TableCell>{getModelPerformanceLabel(model)}</TableCell>
                         <TableCell>{formatDate(model.created_at)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-2">
@@ -284,7 +331,7 @@ const Dashboard = () => {
                               size="sm"
                               onClick={() => navigate(`/model/${model.id}`)}
                             >
-                              <BrainCircuit className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                               <span className="sr-only">View</span>
                             </Button>
                             <Button

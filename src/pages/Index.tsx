@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,6 @@ const Index = () => {
   const [modelResults, setModelResults] = useState<any | null>(null);
   const [savedDatasetId, setSavedDatasetId] = useState<string | null>(null);
   
-  // Handle file upload
   const handleFileUpload = async (file: File) => {
     setDatasetFile(file);
     setIsProcessingData(true);
@@ -47,6 +45,31 @@ const Index = () => {
     try {
       const info = await processDataset(file);
       setDatasetInfo(info);
+      
+      if (user) {
+        const filePath = `${user.id}/${file.name}`;
+        
+        const { data, error } = await supabase
+          .from('datasets')
+          .insert({
+            user_id: user.id,
+            name: file.name,
+            description: `Uploaded on ${new Date().toLocaleDateString()}`,
+            file_path: filePath,
+            columns: info.columns,
+            shape: info.shape,
+            problem_type: info.problemType || 'unknown'
+          })
+          .select()
+          .single();
+          
+        if (error) {
+          console.error("Error saving dataset metadata:", error);
+        } else {
+          setSavedDatasetId(data.id);
+        }
+      }
+      
       toast({
         title: "Dataset processed successfully",
         description: `Detected ${info.shape[0]} rows and ${info.shape[1]} columns.`,
@@ -63,47 +86,10 @@ const Index = () => {
     }
   };
   
-  // Save dataset to Supabase
-  const saveDatasetToSupabase = async () => {
-    if (!user || !datasetInfo || !datasetFile) return null;
-    
-    try {
-      // First check if we already saved this dataset
-      if (savedDatasetId) return savedDatasetId;
-      
-      // Save dataset metadata to Supabase
-      const { data, error } = await supabase
-        .from('datasets')
-        .insert({
-          user_id: user.id,
-          name: datasetFile.name,
-          description: `Uploaded on ${new Date().toLocaleDateString()}`,
-          columns: datasetInfo.columns,
-          shape: datasetInfo.shape,
-          problem_type: datasetInfo.problemType || 'unknown'
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Store the dataset ID for later use
-      setSavedDatasetId(data.id);
-      return data.id;
-    } catch (error: any) {
-      console.error("Error saving dataset:", error);
-      return null;
-    }
-  };
-  
-  // Handle model selection
   const handleModelSelect = async (model: string, hyperparams: any) => {
     setSelectedModel(model);
     setModelHyperparams(hyperparams);
     setIsTrainingModel(true);
-    
-    // First save the dataset if not already saved
-    const datasetId = await saveDatasetToSupabase();
     
     toast({
       title: "Training model",
@@ -114,18 +100,21 @@ const Index = () => {
       const results = await trainModel(datasetInfo, model, hyperparams);
       setModelResults(results);
       
-      // Save the model to Supabase if user is logged in
-      if (user && datasetId) {
-        await supabase
+      if (user && savedDatasetId) {
+        const { error } = await supabase
           .from('models')
           .insert({
             user_id: user.id,
-            dataset_id: datasetId,
+            dataset_id: savedDatasetId,
             name: `${model} for ${datasetFile?.name || 'Dataset'}`,
             model_type: model,
             hyperparams: hyperparams,
             metrics: results.metrics
           });
+          
+        if (error) {
+          console.error("Error saving model:", error);
+        }
       }
       
       toast({
@@ -144,7 +133,6 @@ const Index = () => {
     }
   };
   
-  // Helper to get success message based on problem type
   const getProblemTypeSuccessMessage = (problemType: string | undefined, results: any): string => {
     if (problemType === 'classification') {
       return `Classification model achieved ${(results.metrics.accuracy * 100).toFixed(1)}% accuracy.`;
@@ -156,12 +144,10 @@ const Index = () => {
     return "Model training completed successfully.";
   };
   
-  // Handle data updates from preprocessing
   const handleDataUpdate = (updatedData: any) => {
     setDatasetInfo(updatedData);
   };
   
-  // Handle export model
   const handleExportModel = () => {
     if (!modelResults) return;
     
@@ -180,7 +166,6 @@ const Index = () => {
     });
   };
   
-  // Handle export report
   const handleExportReport = () => {
     if (!datasetInfo || !modelResults) return;
     
@@ -199,7 +184,6 @@ const Index = () => {
     });
   };
   
-  // Show the appropriate step content
   const renderStepContent = () => {
     switch (currentStep) {
       case 'upload':
@@ -356,12 +340,20 @@ const Index = () => {
     }
   };
   
+  useEffect(() => {
+    if (modelResults && user) {
+      toast({
+        title: "Results saved to dashboard",
+        description: "You can view your dataset and model in your dashboard",
+      });
+    }
+  }, [modelResults, user]);
+  
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1 container max-w-6xl mx-auto py-8 px-4">
-        {/* Steps Progress */}
         <div className="mb-12">
           <Tabs value={currentStep} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
@@ -428,7 +420,6 @@ const Index = () => {
           </Tabs>
         </div>
         
-        {/* Main Content */}
         <div className="mt-4">
           <AnimatePresence mode="wait">
             {renderStepContent()}
@@ -436,7 +427,6 @@ const Index = () => {
         </div>
       </main>
       
-      {/* Footer */}
       <footer className="py-6 border-t">
         <div className="container max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>No-Code Machine Learning Platform • Created with modern web technologies</p>
