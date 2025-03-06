@@ -1,3 +1,4 @@
+
 // This is a mock implementation of ML functionality
 // In a real implementation, these would connect to a backend service
 
@@ -385,25 +386,168 @@ export async function trainModel(
   return new Promise((resolve) => {
     // Simulate training delay
     setTimeout(() => {
-      // Return mock results based on the model type
+      // Generate results based on the model type and hyperparameters
       if (datasetInfo.problemType === 'classification') {
-        resolve({
-          model: modelType,
-          metrics: {
-            accuracy: 0.87,
-            precision: 0.84,
-            recall: 0.91,
-            f1: 0.87
-          },
-          featureImportance: [
+        // Adjust metrics based on model type and hyperparameters
+        let baseAccuracy = 0;
+        let basePrecision = 0;
+        let baseRecall = 0;
+        let baseF1 = 0;
+        let featureImportance = [];
+
+        // Set base metrics according to model type
+        if (modelType === 'logistic_regression') {
+          baseAccuracy = 0.82;
+          basePrecision = 0.80;
+          baseRecall = 0.83;
+          baseF1 = 0.81;
+          
+          // Adjust metrics based on regularization strength
+          if (hyperparams.C) {
+            // Lower C means stronger regularization 
+            const regularizationEffect = (hyperparams.C - 0.1) / 10; // Scale between 0-1
+            baseAccuracy += regularizationEffect * 0.05;
+            basePrecision += regularizationEffect * 0.04;
+            baseRecall += regularizationEffect * 0.02;
+            baseF1 += regularizationEffect * 0.04;
+          }
+          
+          // Adjust based on penalty type
+          if (hyperparams.penalty === 'l1') {
+            baseAccuracy -= 0.01;
+            basePrecision += 0.02;
+            baseRecall -= 0.01;
+          }
+
+          featureImportance = [
+            { name: 'income', importance: 0.45 },
+            { name: 'age', importance: 0.25 },
+            { name: 'education', importance: 0.20 },
+            { name: 'occupation', importance: 0.10 }
+          ];
+        } 
+        else if (modelType === 'random_forest') {
+          baseAccuracy = 0.87;
+          basePrecision = 0.85;
+          baseRecall = 0.88;
+          baseF1 = 0.86;
+          
+          // Adjust based on number of trees
+          if (hyperparams.n_estimators) {
+            const numTreesEffect = (hyperparams.n_estimators - 10) / 500; // Scale between 0-1
+            baseAccuracy += numTreesEffect * 0.06;
+            basePrecision += numTreesEffect * 0.07;
+            baseRecall += numTreesEffect * 0.05;
+            baseF1 += numTreesEffect * 0.06;
+          }
+          
+          // Adjust based on max depth
+          if (hyperparams.max_depth) {
+            const maxDepthEffect = (hyperparams.max_depth - 2) / 28; // Scale between 0-1
+            // Too deep trees might overfit
+            if (hyperparams.max_depth > 20) {
+              baseAccuracy -= 0.02;
+              basePrecision += 0.01;
+              baseRecall += 0.02;
+              baseF1 += 0.005;
+            } else {
+              baseAccuracy += maxDepthEffect * 0.04;
+              basePrecision += maxDepthEffect * 0.03;
+              baseRecall += maxDepthEffect * 0.05;
+              baseF1 += maxDepthEffect * 0.04;
+            }
+          }
+
+          featureImportance = [
             { name: 'income', importance: 0.42 },
             { name: 'age', importance: 0.28 },
             { name: 'education', importance: 0.18 },
             { name: 'occupation', importance: 0.12 }
-          ],
+          ];
+        } 
+        else if (modelType === 'xgboost') {
+          baseAccuracy = 0.89;
+          basePrecision = 0.88;
+          baseRecall = 0.89;
+          baseF1 = 0.88;
+          
+          // Adjust based on number of trees
+          if (hyperparams.n_estimators) {
+            const numTreesEffect = (hyperparams.n_estimators - 10) / 500; // Scale between 0-1
+            baseAccuracy += numTreesEffect * 0.04;
+            basePrecision += numTreesEffect * 0.05;
+            baseRecall += numTreesEffect * 0.04;
+            baseF1 += numTreesEffect * 0.05;
+          }
+          
+          // Adjust based on learning rate - lower is better but needs more trees
+          if (hyperparams.learning_rate) {
+            const learningRateEffect = (0.3 - hyperparams.learning_rate) / 0.29; // Scale between 0-1
+            baseAccuracy += learningRateEffect * 0.03;
+            basePrecision += learningRateEffect * 0.02;
+            baseRecall += learningRateEffect * 0.02;
+            baseF1 += learningRateEffect * 0.025;
+          }
+          
+          // Adjust based on max depth
+          if (hyperparams.max_depth) {
+            const maxDepthEffect = (hyperparams.max_depth - 2) / 13; // Scale between 0-1
+            // Too deep trees might overfit
+            if (hyperparams.max_depth > 10) {
+              baseAccuracy -= 0.02;
+              basePrecision -= 0.01;
+              baseRecall += 0.03;
+              baseF1 -= 0.005;
+            } else {
+              baseAccuracy += maxDepthEffect * 0.03;
+              basePrecision += maxDepthEffect * 0.04;
+              baseRecall += maxDepthEffect * 0.03;
+              baseF1 += maxDepthEffect * 0.035;
+            }
+          }
+
+          featureImportance = [
+            { name: 'income', importance: 0.48 },
+            { name: 'age', importance: 0.24 },
+            { name: 'education', importance: 0.16 },
+            { name: 'occupation', importance: 0.12 }
+          ];
+        }
+        
+        // Add some randomness to make each run slightly different
+        const randomVariation = 0.01;
+        baseAccuracy += (Math.random() * randomVariation * 2) - randomVariation;
+        basePrecision += (Math.random() * randomVariation * 2) - randomVariation;
+        baseRecall += (Math.random() * randomVariation * 2) - randomVariation;
+        baseF1 += (Math.random() * randomVariation * 2) - randomVariation;
+        
+        // Ensure values are between 0 and 1
+        const clamp = (num: number) => Math.max(0, Math.min(1, num));
+        baseAccuracy = clamp(baseAccuracy);
+        basePrecision = clamp(basePrecision);
+        baseRecall = clamp(baseRecall);
+        baseF1 = clamp(baseF1);
+        
+        // Generate confusion matrix proportional to accuracy
+        const total = 1000;
+        const truePositives = Math.round((baseAccuracy * total) / 2);
+        const trueNegatives = Math.round((baseAccuracy * total) / 2);
+        const falsePositives = Math.round(((1 - basePrecision) * truePositives) / basePrecision);
+        const falseNegatives = Math.round(total - truePositives - trueNegatives - falsePositives);
+        
+        resolve({
+          model: modelType,
+          hyperparams: hyperparams, // Include the hyperparameters in the result
+          metrics: {
+            accuracy: baseAccuracy,
+            precision: basePrecision,
+            recall: baseRecall,
+            f1: baseF1
+          },
+          featureImportance: featureImportance,
           confusion: [
-            [450, 50],
-            [80, 420]
+            [trueNegatives, falsePositives],
+            [falseNegatives, truePositives]
           ],
           probabilities: [
             [0.92, 0.08],
@@ -425,12 +569,71 @@ export async function trainModel(
           };
         });
         
+        // Adjust metrics based on model type and hyperparameters
+        let baseR2 = 0;
+        let baseRMSE = 0;
+        let baseMAE = 0;
+        
+        if (modelType === 'linear_regression') {
+          baseR2 = 0.76;
+          baseRMSE = 12.8;
+          baseMAE = 9.5;
+          
+          // Add hyperparameter effects here
+        } 
+        else if (modelType === 'random_forest_regressor') {
+          baseR2 = 0.83;
+          baseRMSE = 9.75;
+          baseMAE = 7.32;
+          
+          // Adjust based on number of trees
+          if (hyperparams.n_estimators) {
+            const numTreesEffect = (hyperparams.n_estimators - 10) / 500;
+            baseR2 += numTreesEffect * 0.05;
+            baseRMSE -= numTreesEffect * 1.5;
+            baseMAE -= numTreesEffect * 1.2;
+          }
+          
+          // Adjust based on max depth
+          if (hyperparams.max_depth) {
+            const maxDepthEffect = (hyperparams.max_depth - 2) / 28;
+            if (hyperparams.max_depth > 20) {
+              baseR2 -= 0.02;
+              baseRMSE += 0.8;
+              baseMAE += 0.6;
+            } else {
+              baseR2 += maxDepthEffect * 0.06;
+              baseRMSE -= maxDepthEffect * 2;
+              baseMAE -= maxDepthEffect * 1.5;
+            }
+          }
+        } 
+        else if (modelType === 'xgboost_regressor') {
+          baseR2 = 0.85;
+          baseRMSE = 8.9;
+          baseMAE = 6.7;
+          
+          // Add hyperparameter effects here
+        }
+        
+        // Add some randomness
+        const randomVariation = 0.02;
+        baseR2 += (Math.random() * randomVariation * 2) - randomVariation;
+        baseRMSE += (Math.random() * 0.5 * 2) - 0.5;
+        baseMAE += (Math.random() * 0.4 * 2) - 0.4;
+        
+        // Ensure values are reasonable
+        baseR2 = Math.max(0, Math.min(1, baseR2));
+        baseRMSE = Math.max(1, baseRMSE);
+        baseMAE = Math.max(1, baseMAE);
+        
         resolve({
           model: modelType,
+          hyperparams: hyperparams,
           metrics: {
-            r2: 0.83,
-            rmse: 9.75,
-            mae: 7.32
+            r2: baseR2,
+            rmse: baseRMSE,
+            mae: baseMAE
           },
           featureImportance: [
             { name: 'income', importance: 0.52 },
@@ -443,11 +646,74 @@ export async function trainModel(
           problemType: datasetInfo.problemType
         });
       } else if (datasetInfo.problemType === 'clustering') {
+        // For clustering, adjust metrics based on the model and parameters
+        let baseSilhouette = 0;
+        let baseInertia = 0;
+        
+        if (modelType === 'kmeans') {
+          baseSilhouette = 0.68;
+          baseInertia = 425.3;
+          
+          // Adjust based on number of clusters
+          if (hyperparams.n_clusters) {
+            const nClustersEffect = (hyperparams.n_clusters - 2) / 18;
+            
+            // Silhouette often has a peak at the optimal cluster number
+            // Let's simulate that with a quadratic function
+            const optimalClusters = 5;
+            const distanceFromOptimal = Math.abs(hyperparams.n_clusters - optimalClusters);
+            
+            if (distanceFromOptimal <= 2) {
+              baseSilhouette += 0.04;
+            } else {
+              baseSilhouette -= (distanceFromOptimal / 18) * 0.15;
+            }
+            
+            // Inertia decreases with more clusters
+            baseInertia -= nClustersEffect * 150;
+          }
+        } 
+        else if (modelType === 'dbscan') {
+          baseSilhouette = 0.71;
+          baseInertia = 380.2;
+          
+          // Adjust based on eps parameter
+          if (hyperparams.eps) {
+            const optimalEps = 0.8;
+            const distanceFromOptimal = Math.abs(hyperparams.eps - optimalEps);
+            
+            if (distanceFromOptimal <= 0.3) {
+              baseSilhouette += 0.05;
+            } else {
+              baseSilhouette -= (distanceFromOptimal / 5) * 0.2;
+            }
+            
+            // Adjust based on min_samples
+            if (hyperparams.min_samples) {
+              if (hyperparams.min_samples > 10) {
+                baseSilhouette -= 0.04;
+              } else if (hyperparams.min_samples < 3) {
+                baseSilhouette -= 0.06; // Too few samples can create noise
+              }
+            }
+          }
+        }
+        
+        // Add some randomness
+        const randomVariation = 0.03;
+        baseSilhouette += (Math.random() * randomVariation * 2) - randomVariation;
+        baseInertia += (Math.random() * 15 * 2) - 15;
+        
+        // Ensure values are reasonable
+        baseSilhouette = Math.max(0, Math.min(1, baseSilhouette));
+        baseInertia = Math.max(50, baseInertia);
+        
         resolve({
           model: modelType,
+          hyperparams: hyperparams,
           metrics: {
-            silhouette_score: 0.68,
-            inertia: 425.3
+            silhouette_score: baseSilhouette,
+            inertia: baseInertia
           },
           featureImportance: [
             { name: 'income', importance: 0.48 },
