@@ -18,6 +18,7 @@ interface Dataset {
   created_at: string;
   problem_type: string | null;
   shape: any;
+  file_path: string | null; // Added this property to fix the error
 }
 
 interface Model {
