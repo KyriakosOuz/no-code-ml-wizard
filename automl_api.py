@@ -1,9 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Response
 import pandas as pd
 import numpy as np
 import joblib
 import json
-from io import StringIO
+import matplotlib.pyplot as plt
+import seaborn as sns
+from io import StringIO, BytesIO
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
 from sklearn.impute import SimpleImputer, KNNImputer
@@ -93,7 +95,20 @@ async def automl_pipeline(file: UploadFile = File(...), target_column: str = For
     train_acc = best_model_instance.score(X_train, y_train)
     test_acc = best_model_instance.score(X_test, y_test)
     
-    return {
+    # Generate confusion matrix plot
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("Confusion Matrix")
+    
+    # Save the plot as a BytesIO object
+    img_bytes = BytesIO()
+    plt.savefig(img_bytes, format='png')
+    img_bytes.seek(0)
+    
+    # Save evaluation report
+    report_data = {
         "model_accuracies": results,
         "best_model": best_model,
         "best_accuracy": best_accuracy,
@@ -104,7 +119,20 @@ async def automl_pipeline(file: UploadFile = File(...), target_column: str = For
         "training_accuracy": train_acc,
         "test_accuracy": test_acc
     }
+    with open("model_report.json", "w") as f:
+        json.dump(report_data, f, indent=4)
+    
+    return {
+        "report": report_data,
+        "confusion_matrix_image": "confusion_matrix.png"
+    }
 
 @app.get("/download-model/")
 def download_model():
-    return {"message": "Download best_model.pkl from your server"}
+    with open("best_model.pkl", "rb") as model_file:
+        return Response(content=model_file.read(), media_type="application/octet-stream", headers={"Content-Disposition": "attachment; filename=best_model.pkl"})
+
+@app.get("/download-report/")
+def download_report():
+    with open("model_report.json", "rb") as report_file:
+        return Response(content=report_file.read(), media_type="application/json", headers={"Content-Disposition": "attachment; filename=model_report.json"})
