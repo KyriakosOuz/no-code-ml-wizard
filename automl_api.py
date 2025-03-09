@@ -107,7 +107,11 @@ async def automl_pipeline(
     try:
         # Load dataset and handle missing value symbol
         contents = await file.read()
-        df = pd.read_csv(StringIO(contents.decode("utf-8")), na_values=[missing_value_symbol, "NA", "N/A", "None", "null", ""])
+        missing_values_list = ["NA", "N/A", "None", "null", ""]
+        if missing_value_symbol.strip():  # Ensure it's not an empty string
+            missing_values_list.append(missing_value_symbol)
+
+        df = pd.read_csv(StringIO(contents.decode("utf-8")), na_values=missing_values_list)
 
         if target_column not in df.columns:
             raise ValueError(f"Target column '{target_column}' not found in dataset.")
