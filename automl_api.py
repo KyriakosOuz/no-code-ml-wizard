@@ -36,50 +36,47 @@ async def upload_dataset(file: UploadFile = File(...)):
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
 
         if df.empty:
-            raise ValueError("❌ Dataset is empty after loading.")
+            raise ValueError("Dataset is empty after loading.")
 
-        print(f"✅ Dataset loaded successfully: {df.shape}")
+        print(f"Dataset loaded successfully: {df.shape}")
 
         # Detect column types
         column_details = []
         for col in df.columns:
             col_type = "categorical" if df[col].dtype == "object" else "numeric"
-            missing_count = df[col].isnull().sum()
+            missing_count = int(df[col].isnull().sum())  # Convert numpy.int64 → int
             missing_percent = round((missing_count / len(df)) * 100, 2)
 
-            stats = (
-                {
-                    "min": df[col].min(),
-                    "max": df[col].max(),
-                    "mean": round(df[col].mean(), 2),
-                    "std_dev": round(df[col].std(), 2),
-                    "median": df[col].median(),
+            if col_type == "numeric":
+                stats = {
+                    "min": float(df[col].min()) if not df[col].isnull().all() else None,
+                    "max": float(df[col].max()) if not df[col].isnull().all() else None,
+                    "mean": round(float(df[col].mean()), 2) if not df[col].isnull().all() else None,
+                    "std_dev": round(float(df[col].std()), 2) if not df[col].isnull().all() else None,
+                    "median": float(df[col].median()) if not df[col].isnull().all() else None,
                 }
-                if col_type == "numeric"
-                else {
-                    "unique_values": df[col].nunique(),
+            else:
+                stats = {
+                    "unique_values": int(df[col].nunique()),  # Convert numpy.int64 → int
                     "most_common": df[col].mode()[0] if not df[col].mode().empty else "N/A",
                 }
-            )
 
-            column_details.append(
-                {
-                    "name": col,
-                    "type": col_type,
-                    "missing_values": missing_count,
-                    "missing_percent": missing_percent,
-                    "stats": stats,
-                }
-            )
+            column_details.append({
+                "name": col,
+                "type": col_type,
+                "missing_values": missing_count,
+                "missing_percent": missing_percent,
+                "stats": stats
+            })
 
         return {
-            "num_rows": len(df),
-            "num_columns": len(df.columns),
-            "column_details": column_details,
+            "num_rows": int(len(df)),  # Convert numpy.int64 → int
+            "num_columns": int(len(df.columns)),  # Convert numpy.int64 → int
+            "column_details": column_details
         }
 
     except Exception as e:
-        print(f"🚨 ERROR: {str(e)}")
+        print(f"ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Dataset upload failed: {str(e)}")
 
 
@@ -98,7 +95,7 @@ async def automl_pipeline(
         if target_column not in df.columns:
             raise ValueError(f"❌ Target column '{target_column}' not found in dataset.")
 
-        print(f"📊 Data loaded: {df.shape}")
+        print(f"Data loaded: {df.shape}")
 
         # Detect categorical and numerical columns
         categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
