@@ -50,6 +50,7 @@ export default function AutoMLDashboard() {
   const [targetColumn, setTargetColumn] = useState<string>("");
   const [missingStrategy, setMissingStrategy] = useState<string>("median");
   const [scalingStrategy, setScalingStrategy] = useState<string>("standard");
+  const [missingValueSymbol, setMissingValueSymbol] = useState<string>("");
   
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<any>(null);
@@ -106,6 +107,7 @@ export default function AutoMLDashboard() {
       const response = await processAutoML({
         file,
         targetColumn,
+        missingValueSymbol,
         missingValueStrategy: missingStrategy,
         scalingStrategy
       });
@@ -248,6 +250,17 @@ export default function AutoMLDashboard() {
                                 <SelectItem value="remove">Remove Rows</SelectItem>
                               </SelectContent>
                             </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="missing-symbol">Missing Value Symbol</Label>
+                            <Input
+                              id="missing-symbol"
+                              type="text"
+                              placeholder="Enter symbol (e.g., ?, -, NaN, etc.)"
+                              value={missingValueSymbol}
+                              onChange={(e) => setMissingValueSymbol(e.target.value)}
+                            />
                           </div>
                           
                           <div className="space-y-2">
