@@ -25,7 +25,7 @@ app = FastAPI()
 # Allow Lovable frontend to access the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://preview--no-code-ml-wizard.lovable.app"],  # Update with your Lovable frontend URL
+    allow_origins=["*"],  # Update with your Lovable frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
