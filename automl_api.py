@@ -5,6 +5,7 @@ import joblib
 import json
 import matplotlib.pyplot as plt
 import seaborn as sns
+import io
 from io import StringIO, BytesIO
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
