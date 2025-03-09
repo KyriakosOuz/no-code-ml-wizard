@@ -1,63 +1,48 @@
 
-import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useAuth } from '@/contexts/AuthContext';
-import { Database, BrainCircuit, LogIn, User, LayoutDashboard } from 'lucide-react';
+import { useAuth } from "@/contexts/AuthContext";
 
-const Header = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  
+export default function Header() {
+  const { user, signOut } = useAuth();
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link to="/" className="flex items-center space-x-2">
-            <BrainCircuit className="h-6 w-6" />
-            <span className="hidden font-bold sm:inline-block">
-              ML Platform
-            </span>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 flex">
+          <Link to="/" className="mr-6 flex items-center space-x-2">
+            <span className="font-bold">AutoML Wizard</span>
           </Link>
-          
-          <nav className="hidden md:flex items-center gap-6 ml-6">
-            <Link to="/" className="text-sm font-medium transition-colors hover:text-primary">
-              Home
+          <nav className="flex items-center space-x-6 text-sm font-medium">
+            <Link
+              to="/dashboard"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              Dashboard
             </Link>
-            {user && (
-              <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
-                Dashboard
-              </Link>
-            )}
+            <Link
+              to="/model-training"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              Model Training
+            </Link>
           </nav>
         </div>
-        
-        <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center space-x-2 justify-end">
           {user ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/dashboard')}
+            <Button 
+              variant="outline" 
+              onClick={signOut}
             >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+              Sign Out
             </Button>
           ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/auth')}
-            >
-              <LogIn className="h-4 w-4" />
-              Sign In
+            <Button asChild variant="outline">
+              <Link to="/auth">Sign In</Link>
             </Button>
           )}
         </div>
       </div>
     </header>
   );
-};
-
-export default Header;
+}
