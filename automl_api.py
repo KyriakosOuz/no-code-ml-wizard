@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, Response, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import numpy as np
 import joblib
@@ -20,6 +21,15 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from pydantic import BaseModel
 
 app = FastAPI()
+
+# Allow Lovable frontend to access the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://preview--no-code-ml-wizard.lovable.app"],  # Update with your Lovable frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class DatasetOverviewResponse(BaseModel):
     num_rows: int
@@ -76,7 +86,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        print(f"ERROR: {str(e)}")
+        print(f"🚨 ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Dataset upload failed: {str(e)}")
 
 
@@ -93,7 +103,7 @@ async def automl_pipeline(
         df = pd.read_csv(StringIO(contents.decode("utf-8")))
 
         if target_column not in df.columns:
-            raise ValueError(f"❌ Target column '{target_column}' not found in dataset.")
+            raise ValueError(f"Target column '{target_column}' not found in dataset.")
 
         print(f"Data loaded: {df.shape}")
 
