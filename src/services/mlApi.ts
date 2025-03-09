@@ -50,6 +50,12 @@ export const uploadDataset = async (file: File): Promise<DatasetOverview> => {
   return response.data;
 };
 
+// Add the uploadCSV function that ModelTraining is expecting to use
+export const uploadCSV = async (params: UploadParams) => {
+  // This is essentially the same as processAutoML but with a different name
+  return processAutoML(params);
+};
+
 export const processAutoML = async (params: UploadParams) => {
   const formData = new FormData();
   formData.append("file", params.file);
