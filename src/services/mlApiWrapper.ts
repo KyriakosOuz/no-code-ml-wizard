@@ -1,15 +1,22 @@
 
-import { UploadParams, processAutoML, uploadCSV } from "./mlApi";
+import { uploadDataset, uploadCSV, processAutoML, UploadParams } from "./mlApi";
 import { withDefaultParams } from "./defaultParams";
 
-// Wrapper function for processAutoML that handles defaults
-export const processAutoMLWithDefaults = async (params: Partial<UploadParams>) => {
-  const completeParams = withDefaultParams(params);
-  return processAutoML(completeParams);
+export const uploadDatasetWithDefaults = uploadDataset;
+
+export const uploadCSVWithDefaults = (params: Partial<UploadParams>) => {
+  return uploadCSV(withDefaultParams(params));
 };
 
-// Wrapper function for uploadCSV that handles defaults
-export const uploadCSVWithDefaults = async (params: Partial<UploadParams>) => {
-  const completeParams = withDefaultParams(params);
-  return uploadCSV(completeParams);
+export const processAutoMLWithDefaults = (params: Partial<UploadParams>) => {
+  return processAutoML(withDefaultParams(params));
 };
+
+// Re-export other functions from mlApi.ts
+export { 
+  downloadModel, 
+  downloadReport, 
+  getConfusionMatrixUrl, 
+  getFeatureImportanceUrl, 
+  getPrecisionRecallUrl 
+} from "./mlApi";
