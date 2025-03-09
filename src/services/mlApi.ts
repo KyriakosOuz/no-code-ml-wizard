@@ -8,7 +8,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
-  missingValueSymbol?: string; // Added this parameter
+  missingValueSymbol: string; // Updated to make this a required field
 }
 
 export interface DatasetOverview {
@@ -73,11 +73,7 @@ export const processAutoML = async (params: UploadParams) => {
     formData.append("target_column", params.targetColumn);
     formData.append("missing_value_strategy", params.missingValueStrategy);
     formData.append("scaling_strategy", params.scalingStrategy);
-    
-    // Add the missingValueSymbol if it's provided
-    if (params.missingValueSymbol) {
-      formData.append("missing_value_symbol", params.missingValueSymbol);
-    }
+    formData.append("missing_value_symbol", params.missingValueSymbol);
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
@@ -91,6 +87,11 @@ export const processAutoML = async (params: UploadParams) => {
     console.error("Error processing AutoML:", error);
     if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
       throw new Error("Network error: Unable to connect to the ML server. Please check your internet connection and try again.");
+    }
+    // Add more detailed error message based on actual API response
+    if (axios.isAxiosError(error) && error.response) {
+      const errorDetail = error.response.data?.detail || "Unknown server error";
+      throw new Error(`Failed to process the dataset: ${errorDetail}`);
     }
     throw new Error("Failed to process the dataset. Please check that the target column exists and try again.");
   }
