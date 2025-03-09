@@ -8,7 +8,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
-  missingValueSymbol: string; // Updated to make this a required field
+  missingValueSymbol?: string; // Changed back to optional to maintain compatibility
 }
 
 export interface DatasetOverview {
@@ -73,7 +73,10 @@ export const processAutoML = async (params: UploadParams) => {
     formData.append("target_column", params.targetColumn);
     formData.append("missing_value_strategy", params.missingValueStrategy);
     formData.append("scaling_strategy", params.scalingStrategy);
-    formData.append("missing_value_symbol", params.missingValueSymbol);
+    
+    // Use default "?" if missingValueSymbol is not provided
+    const missingValueSymbol = params.missingValueSymbol || "?";
+    formData.append("missing_value_symbol", missingValueSymbol);
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
