@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Response
+from fastapi import FastAPI, UploadFile, File, Form, Response, HTTPException
 import pandas as pd
 import numpy as np
 import joblib
@@ -28,9 +28,12 @@ class DatasetOverviewResponse(BaseModel):
 @app.post("/upload-dataset/", response_model=DatasetOverviewResponse)
 async def upload_dataset(file: UploadFile = File(...)):
     try:
-        # Read the CSV file
+        # Read CSV file into DataFrame
         contents = await file.read()
-        df = pd.read_csv(io.BytesIO(contents))
+        df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+
+        # Log dataset shape to verify it's loaded
+        print(f"Dataset loaded successfully: {df.shape}")
 
         # Detect column types
         column_details = []
@@ -66,9 +69,10 @@ async def upload_dataset(file: UploadFile = File(...)):
             "num_columns": len(df.columns),
             "column_details": column_details
         }
-    
+
     except Exception as e:
-        return {"error": str(e)}
+        print(f"ERROR: {str(e)}")  # Log error to see what's wrong
+        raise HTTPException(status_code=500, detail=f"Dataset upload failed: {str(e)}")
 
 @app.post("/automl/")
 async def automl_pipeline(file: UploadFile = File(...), target_column: str = Form(...), missing_value_strategy: str = Form("median"), scaling_strategy: str = Form("standard")):
