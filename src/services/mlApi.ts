@@ -8,6 +8,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
+  missingValueSymbol?: string; // Added this parameter
 }
 
 export interface DatasetOverview {
@@ -72,12 +73,17 @@ export const processAutoML = async (params: UploadParams) => {
     formData.append("target_column", params.targetColumn);
     formData.append("missing_value_strategy", params.missingValueStrategy);
     formData.append("scaling_strategy", params.scalingStrategy);
+    
+    // Add the missingValueSymbol if it's provided
+    if (params.missingValueSymbol) {
+      formData.append("missing_value_symbol", params.missingValueSymbol);
+    }
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      timeout: 120000, // Updated to 120 seconds (2 minutes) for model training
+      timeout: 120000, // 120 seconds (2 minutes) for model training
     });
 
     return response.data;
@@ -110,4 +116,12 @@ export const downloadReport = (): void => {
 
 export const getConfusionMatrixUrl = (): string => {
   return `${API_BASE_URL}/static/confusion_matrix.png`;
+};
+
+export const getFeatureImportanceUrl = (): string => {
+  return `${API_BASE_URL}/static/feature_importance.png`;
+};
+
+export const getPrecisionRecallUrl = (): string => {
+  return `${API_BASE_URL}/static/precision_recall.png`;
 };
