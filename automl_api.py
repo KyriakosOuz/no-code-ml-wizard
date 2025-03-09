@@ -12,14 +12,14 @@ import shutil
 from io import StringIO, BytesIO
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
-from sklearn.impute import KNNImputer
+from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from xgboost import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_curve
 from pydantic import BaseModel
 import uvicorn
 
@@ -49,7 +49,7 @@ async def upload_dataset(file: UploadFile = File(...)):
 
         # Read CSV into DataFrame
         contents = await file.read()
-        df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
+        df = pd.read_csv(io.StringIO(contents.decode("utf-8")), na_values=["?", "NA", "N/A", "None", "null", ""])
 
         if df.empty:
             raise ValueError("Dataset is empty after loading.")
@@ -100,13 +100,14 @@ async def upload_dataset(file: UploadFile = File(...)):
 async def automl_pipeline(
     file: UploadFile = File(...),
     target_column: str = Form(...),
+    missing_value_symbol: str = Form("?"),
     missing_value_strategy: str = Form("median"),
     scaling_strategy: str = Form("standard"),
 ):
     try:
-        # Load dataset
+        # Load dataset and handle missing value symbol
         contents = await file.read()
-        df = pd.read_csv(StringIO(contents.decode("utf-8")))
+        df = pd.read_csv(StringIO(contents.decode("utf-8")), na_values=[missing_value_symbol, "NA", "N/A", "None", "null", ""])
 
         if target_column not in df.columns:
             raise ValueError(f"Target column '{target_column}' not found in dataset.")
@@ -118,15 +119,20 @@ async def automl_pipeline(
         numerical_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
         # Handle missing values
-        if missing_value_strategy == "median":
-            df.fillna(df.median(numeric_only=True), inplace=True)
-        elif missing_value_strategy == "mean":
-            df.fillna(df.mean(numeric_only=True), inplace=True)
-        elif missing_value_strategy == "mode":
-            df.fillna(df.mode().iloc[0], inplace=True)
-        elif missing_value_strategy == "knn":
-            imputer = KNNImputer(n_neighbors=5)
+        if missing_value_strategy == "mean":
+            imputer = SimpleImputer(strategy="mean")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+        elif missing_value_strategy == "median":
+            imputer = SimpleImputer(strategy="median")
+            df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+        elif missing_value_strategy == "most_frequent":
+            imputer = SimpleImputer(strategy="most_frequent")
+            df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+        elif missing_value_strategy == "hot_deck":
+            for col in numerical_cols:
+                df[col].fillna(df[col].dropna().sample(n=len(df[col].isnull()), replace=True).values, inplace=True)
+            for col in categorical_cols:
+                df[col].fillna(df[col].dropna().sample(n=len(df[col].isnull()), replace=True).values, inplace=True)
         elif missing_value_strategy == "remove":
             df.dropna(inplace=True)
 
@@ -198,6 +204,25 @@ async def automl_pipeline(
         plt.savefig(output_path, format="png", bbox_inches="tight")
         plt.close()
 
+        # Feature Importance
+        plt.figure(figsize=(10, 5))
+        sns.barplot(x=best_model_instance.feature_importances_, y=X.columns)
+        plt.title("Feature Importance")
+        feature_importance_img = BytesIO()
+        plt.savefig("static/feature_importance.png", format="png", bbox_inches="tight")
+        plt.close()
+
+        # Precision-Recall Curve
+        precision, recall, _ = precision_recall_curve(y_test, best_model_instance.predict_proba(X_test)[:, 1])
+        plt.figure(figsize=(8, 6))
+        plt.plot(recall, precision, marker=".", label=best_model)
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.title("Precision-Recall Curve")
+        pr_curve_img = BytesIO()
+        plt.savefig("static/precision_recall.png", format="png", bbox_inches="tight")
+        plt.close()
+
         # Save evaluation report
         report_data = {
             "model_accuracies": results,
@@ -213,7 +238,12 @@ async def automl_pipeline(
         with open("model_report.json", "w") as f:
             json.dump(report_data, f, indent=4)
 
-        return {"report": report_data, "confusion_matrix_image": "/static/confusion_matrix.png"}
+        return {
+            "report": report_data,
+            "confusion_matrix_image": "/static/confusion_matrix.png",
+            "feature_importance_image": "/static/feature_importance.png",
+            "precision_recall_image": "/static/precision_recall.png"
+        }
 
     except Exception as e:
         print(f"ERROR: {str(e)}")
