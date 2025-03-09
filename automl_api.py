@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Mount the static directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 class DatasetOverviewResponse(BaseModel):
     num_rows: int
@@ -45,7 +45,7 @@ class DatasetOverviewResponse(BaseModel):
 @app.post("/upload-dataset/", response_model=DatasetOverviewResponse)
 async def upload_dataset(file: UploadFile = File(...)):
     try:
-        print(f"📂 Received file: {file.filename}")
+        print(f"Received file: {file.filename}")
 
         # Read CSV into DataFrame
         contents = await file.read()
