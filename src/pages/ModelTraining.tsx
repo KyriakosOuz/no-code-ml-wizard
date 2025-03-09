@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Spinner } from "@/components/ui/spinner";
-import { uploadCSV, downloadModel, downloadReport } from "@/services/mlApi";
+import { uploadCSV, downloadModel, downloadReport, getConfusionMatrixUrl } from "@/services/mlApi";
 
 const ModelTraining = () => {
   useEffect(() => {
@@ -26,6 +27,7 @@ const ModelTraining = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [reportData, setReportData] = useState<any>(null);
+  const [confusionMatrixVisible, setConfusionMatrixVisible] = useState<boolean>(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -57,6 +59,7 @@ const ModelTraining = () => {
     setIsLoading(true);
     setAccuracy(null);
     setReportData(null);
+    setConfusionMatrixVisible(false);
 
     try {
       const response = await uploadCSV({
@@ -66,23 +69,24 @@ const ModelTraining = () => {
         scalingStrategy,
       });
 
-      setAccuracy(response.accuracy);
+      setAccuracy(response.report?.best_accuracy || 0);
+      setConfusionMatrixVisible(true);
+      
       toast({
         title: "Success",
-        description: `Model trained successfully with accuracy: ${(response.accuracy * 100).toFixed(2)}%`,
+        description: `Model trained successfully with accuracy: ${((response.report?.best_accuracy || 0) * 100).toFixed(2)}%`,
       });
 
       // Try to fetch the report automatically after successful training
       try {
-        const reportResponse = await downloadReport();
-        setReportData(reportResponse);
+        setReportData(response.report);
       } catch (error) {
         console.error("Failed to fetch report:", error);
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to train model. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to train model. Please try again.",
         variant: "destructive",
       });
       console.error(error);
@@ -219,6 +223,23 @@ const ModelTraining = () => {
                   {(accuracy * 100).toFixed(2)}%
                 </div>
               </div>
+              
+              {confusionMatrixVisible && (
+                <div className="mt-6">
+                  <h3 className="text-xl font-semibold mb-4">Confusion Matrix</h3>
+                  <div className="flex justify-center">
+                    <img 
+                      src={getConfusionMatrixUrl()} 
+                      alt="Confusion Matrix" 
+                      className="max-w-full h-auto border rounded shadow-sm"
+                      onError={(e) => {
+                        console.error("Failed to load confusion matrix image");
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               
               <div className="flex justify-center gap-4 mt-6">
                 <Button onClick={handleDownloadModel} variant="outline">

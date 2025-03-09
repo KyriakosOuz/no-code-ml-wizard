@@ -109,5 +109,5 @@ export const downloadReport = (): void => {
 };
 
 export const getConfusionMatrixUrl = (): string => {
-  return `${API_BASE_URL}/confusion_matrix.png`;
+  return `${API_BASE_URL}/static/confusion_matrix.png`;
 };
