@@ -122,19 +122,32 @@ async def automl_pipeline(
         if missing_value_strategy == "mean":
             imputer = SimpleImputer(strategy="mean")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+
         elif missing_value_strategy == "median":
             imputer = SimpleImputer(strategy="median")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+
         elif missing_value_strategy == "most_frequent":
             imputer = SimpleImputer(strategy="most_frequent")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+            df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Handle categorical
+
         elif missing_value_strategy == "hot_deck":
+            # Hot Deck Imputation for Numerical Columns
             for col in numerical_cols:
-                df[col].fillna(df[col].dropna().sample(n=len(df[col].isnull()), replace=True).values, inplace=True)
+                missing_count = df[col].isnull().sum()
+                if missing_count > 0:
+                    df.loc[df[col].isnull(), col] = df[col].dropna().sample(n=missing_count, replace=True, random_state=42).values
+
+            # Hot Deck Imputation for Categorical Columns
             for col in categorical_cols:
-                df[col].fillna(df[col].dropna().sample(n=len(df[col].isnull()), replace=True).values, inplace=True)
+                missing_count = df[col].isnull().sum()
+                if missing_count > 0:
+                    df.loc[df[col].isnull(), col] = df[col].dropna().sample(n=missing_count, replace=True, random_state=42).values
+
         elif missing_value_strategy == "remove":
             df.dropna(inplace=True)
+
 
         # Encode categorical target variable
         label_encoder = LabelEncoder()
