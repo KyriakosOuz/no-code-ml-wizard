@@ -8,7 +8,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
-  missingValueSymbol?: string; // Changed from required to optional
+  missingValueSymbol?: string; // Optional since we provide a default
 }
 
 export interface DatasetOverview {
@@ -23,6 +23,7 @@ export interface ColumnDetail {
   missing_values: number;
   missing_percent: number;
   stats: NumericStats | CategoricalStats;
+  sample_missing_row?: string; // Added sample row field for columns with missing values
 }
 
 interface NumericStats {
@@ -68,12 +69,18 @@ export const uploadCSV = async (params: UploadParams) => {
 
 export const processAutoML = async (params: UploadParams) => {
   try {
+    console.log("Processing AutoML with params:", params); // Add debugging
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("target_column", params.targetColumn);
     formData.append("missing_value_strategy", params.missingValueStrategy);
     formData.append("scaling_strategy", params.scalingStrategy);
-    formData.append("missing_value_symbol", params.missingValueSymbol || "?"); // Default to "?" if not provided
+    
+    // Ensure missing value symbol is explicitly set and not undefined
+    const missingValueSymbol = params.missingValueSymbol || "?";
+    formData.append("missing_value_symbol", missingValueSymbol);
+    
+    console.log("Using missing value symbol:", missingValueSymbol); // Add debugging
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {

@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, UploadFile, File, Form, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -62,6 +63,14 @@ async def upload_dataset(file: UploadFile = File(...)):
             col_type = "categorical" if df[col].dtype == "object" else "numeric"
             missing_count = int(df[col].isnull().sum())  # Convert numpy.int64 → int
             missing_percent = round((missing_count / len(df)) * 100, 2)
+            
+            # Get a sample row with missing value if any
+            sample_missing_row = None
+            if missing_count > 0:
+                missing_index = df[df[col].isnull()].index[0]
+                sample_row = df.iloc[missing_index].to_dict()
+                # Convert the row to a string representation
+                sample_missing_row = str(sample_row)
 
             if col_type == "numeric":
                 stats = {
@@ -77,13 +86,19 @@ async def upload_dataset(file: UploadFile = File(...)):
                     "most_common": df[col].mode()[0] if not df[col].mode().empty else "N/A",
                 }
 
-            column_details.append({
+            column_detail = {
                 "name": col,
                 "type": col_type,
                 "missing_values": missing_count,
                 "missing_percent": missing_percent,
                 "stats": stats
-            })
+            }
+            
+            # Add sample row only if missing values exist
+            if sample_missing_row:
+                column_detail["sample_missing_row"] = sample_missing_row
+                
+            column_details.append(column_detail)
 
         return {
             "num_rows": int(len(df)),  # Convert numpy.int64 → int
@@ -105,13 +120,19 @@ async def automl_pipeline(
     scaling_strategy: str = Form("standard"),
 ):
     try:
+        # Log received parameters for debugging
+        print(f"Received parameters: target={target_column}, missing_symbol={missing_value_symbol}, strategy={missing_value_strategy}")
+        
         # Load dataset and handle missing value symbol
         contents = await file.read()
         missing_values_list = ["NA", "N/A", "None", "null", ""]
-        if missing_value_symbol.strip():  # Ensure it's not an empty string
+        if missing_value_symbol and missing_value_symbol.strip():  # Ensure it's not an empty string
             missing_values_list.append(missing_value_symbol)
-
+            
+        print(f"Using missing values list: {missing_values_list}")
+        
         df = pd.read_csv(StringIO(contents.decode("utf-8")), na_values=missing_values_list)
+        print(f"Missing values in dataframe after load: {df.isnull().sum().sum()}")
 
         if target_column not in df.columns:
             raise ValueError(f"Target column '{target_column}' not found in dataset.")
@@ -121,20 +142,31 @@ async def automl_pipeline(
         # Detect categorical and numerical columns
         categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
         numerical_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        
+        print(f"Categorical columns: {categorical_cols}")
+        print(f"Numerical columns: {numerical_cols}")
+        print(f"Missing values before handling: {df.isnull().sum().sum()}")
 
         # Handle missing values
         if missing_value_strategy == "mean":
             imputer = SimpleImputer(strategy="mean")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+            # Also handle categorical columns
+            for col in categorical_cols:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
         elif missing_value_strategy == "median":
             imputer = SimpleImputer(strategy="median")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+            # Also handle categorical columns
+            for col in categorical_cols:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
         elif missing_value_strategy == "most_frequent":
             imputer = SimpleImputer(strategy="most_frequent")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
-            df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Handle categorical
+            for col in categorical_cols:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
         elif missing_value_strategy == "hot_deck":
             # Hot Deck Imputation for Numerical Columns
@@ -151,7 +183,28 @@ async def automl_pipeline(
 
         elif missing_value_strategy == "remove":
             df.dropna(inplace=True)
+            
+        print(f"Missing values after handling: {df.isnull().sum().sum()}")
+        
+        # Verify no NaN values remain
+        if df.isnull().sum().sum() > 0:
+            print("WARNING: NaN values still present after imputation!")
+            columns_with_nan = df.columns[df.isna().any()].tolist()
+            print(f"Columns with NaN: {columns_with_nan}")
+            
+            # Force a second pass of imputation for any remaining NaNs
+            for col in df.columns:
+                if df[col].isnull().sum() > 0:
+                    if col in numerical_cols:
+                        df[col] = df[col].fillna(df[col].median() if not df[col].median() is np.nan else 0)
+                    else:
+                        df[col] = df[col].fillna("Unknown")
 
+        # Encode categorical features
+        for col in categorical_cols:
+            if col != target_column:  # Don't encode the target column yet
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col])
 
         # Encode categorical target variable
         label_encoder = LabelEncoder()
