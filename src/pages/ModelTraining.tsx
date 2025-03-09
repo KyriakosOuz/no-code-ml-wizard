@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +15,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { uploadCSV, downloadModel, downloadReport } from "@/services/mlApi";
 
 const ModelTraining = () => {
+  useEffect(() => {
+    console.log("ModelTraining component mounted");
+  }, []);
+
   const [file, setFile] = useState<File | null>(null);
   const [targetColumn, setTargetColumn] = useState<string>("");
   const [missingValueStrategy, setMissingValueStrategy] = useState<string>("median");
