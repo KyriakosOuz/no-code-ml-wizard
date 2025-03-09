@@ -3,14 +3,14 @@ import axios from "axios";
 
 const API_BASE_URL = "https://no-code-ml-wizard-production.up.railway.app";
 
-interface UploadParams {
+export interface UploadParams {
   file: File;
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
 }
 
-export const uploadCSV = async (params: UploadParams): Promise<any> => {
+export const uploadCSV = async (params: UploadParams) => {
   const formData = new FormData();
   formData.append("file", params.file);
   formData.append("target_column", params.targetColumn);
@@ -27,24 +27,13 @@ export const uploadCSV = async (params: UploadParams): Promise<any> => {
 };
 
 export const downloadModel = async (): Promise<void> => {
-  const response = await axios.get(`${API_BASE_URL}/download-model/`, {
-    responseType: "blob",
-  });
-
-  // Create a download link
-  const url = window.URL.createObjectURL(new Blob([response.data]));
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", "best_model.pkl");
-  document.body.appendChild(link);
-  link.click();
-  
-  // Clean up
-  link.parentNode?.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  window.open(`${API_BASE_URL}/download-model/`);
 };
 
-export const downloadReport = async (): Promise<any> => {
-  const response = await axios.get(`${API_BASE_URL}/download-report/`);
-  return response.data;
+export const downloadReport = async (): Promise<void> => {
+  window.open(`${API_BASE_URL}/download-report/`);
+};
+
+export const getConfusionMatrixUrl = (): string => {
+  return `${API_BASE_URL}/confusion_matrix.png`;
 };
