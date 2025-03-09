@@ -8,7 +8,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
-  missingValueSymbol?: string; // Changed back to optional to maintain compatibility
+  missingValueSymbol?: string; // Optional to maintain compatibility
 }
 
 export interface DatasetOverview {
