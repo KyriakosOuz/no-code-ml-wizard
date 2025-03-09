@@ -38,16 +38,25 @@ interface CategoricalStats {
 }
 
 export const uploadDataset = async (file: File): Promise<DatasetOverview> => {
-  const formData = new FormData();
-  formData.append("file", file);
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const response = await axios.post(`${API_BASE_URL}/upload-dataset/`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+    const response = await axios.post(`${API_BASE_URL}/upload-dataset/`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 30000, // 30 seconds timeout
+    });
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    console.error("Error uploading dataset:", error);
+    if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
+      throw new Error("Network error: Unable to connect to the ML server. Please check your internet connection and try again.");
+    }
+    throw new Error("Failed to analyze the dataset. Please check the file format and try again.");
+  }
 };
 
 // Add the uploadCSV function that ModelTraining is expecting to use
@@ -57,27 +66,46 @@ export const uploadCSV = async (params: UploadParams) => {
 };
 
 export const processAutoML = async (params: UploadParams) => {
-  const formData = new FormData();
-  formData.append("file", params.file);
-  formData.append("target_column", params.targetColumn);
-  formData.append("missing_value_strategy", params.missingValueStrategy);
-  formData.append("scaling_strategy", params.scalingStrategy);
+  try {
+    const formData = new FormData();
+    formData.append("file", params.file);
+    formData.append("target_column", params.targetColumn);
+    formData.append("missing_value_strategy", params.missingValueStrategy);
+    formData.append("scaling_strategy", params.scalingStrategy);
 
-  const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+    const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 60000, // 60 seconds timeout for model training
+    });
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    console.error("Error processing AutoML:", error);
+    if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
+      throw new Error("Network error: Unable to connect to the ML server. Please check your internet connection and try again.");
+    }
+    throw new Error("Failed to process the dataset. Please check that the target column exists and try again.");
+  }
 };
 
 export const downloadModel = (): void => {
-  window.open(`${API_BASE_URL}/download-model/`);
+  try {
+    window.open(`${API_BASE_URL}/download-model/`);
+  } catch (error) {
+    console.error("Error downloading model:", error);
+    throw new Error("Failed to download the model. Please try again later.");
+  }
 };
 
 export const downloadReport = (): void => {
-  window.open(`${API_BASE_URL}/download-report/`);
+  try {
+    window.open(`${API_BASE_URL}/download-report/`);
+  } catch (error) {
+    console.error("Error downloading report:", error);
+    throw new Error("Failed to download the report. Please try again later.");
+  }
 };
 
 export const getConfusionMatrixUrl = (): string => {
