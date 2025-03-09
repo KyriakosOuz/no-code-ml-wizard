@@ -16,8 +16,59 @@ from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, classification_report, confusion_matrix
+from pydantic import BaseModel
 
 app = FastAPI()
+
+class DatasetOverviewResponse(BaseModel):
+    num_rows: int
+    num_columns: int
+    column_details: list
+
+@app.post("/upload-dataset/", response_model=DatasetOverviewResponse)
+async def upload_dataset(file: UploadFile = File(...)):
+    try:
+        # Read the CSV file
+        contents = await file.read()
+        df = pd.read_csv(io.BytesIO(contents))
+
+        # Detect column types
+        column_details = []
+        for col in df.columns:
+            col_type = "categorical" if df[col].dtype == "object" else "numeric"
+            missing_count = df[col].isnull().sum()
+            missing_percent = round((missing_count / len(df)) * 100, 2)
+
+            if col_type == "numeric":
+                stats = {
+                    "min": df[col].min(),
+                    "max": df[col].max(),
+                    "mean": round(df[col].mean(), 2),
+                    "std_dev": round(df[col].std(), 2),
+                    "median": df[col].median()
+                }
+            else:
+                stats = {
+                    "unique_values": df[col].nunique(),
+                    "most_common": df[col].mode()[0] if not df[col].mode().empty else "N/A"
+                }
+
+            column_details.append({
+                "name": col,
+                "type": col_type,
+                "missing_values": missing_count,
+                "missing_percent": missing_percent,
+                "stats": stats
+            })
+
+        return {
+            "num_rows": len(df),
+            "num_columns": len(df.columns),
+            "column_details": column_details
+        }
+    
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.post("/automl/")
 async def automl_pipeline(file: UploadFile = File(...), target_column: str = Form(...), missing_value_strategy: str = Form("median"), scaling_strategy: str = Form("standard")):
