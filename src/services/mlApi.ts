@@ -77,7 +77,7 @@ export const processAutoML = async (params: UploadParams) => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      timeout: 60000, // 60 seconds timeout for model training
+      timeout: 120000, // Updated to 120 seconds (2 minutes) for model training
     });
 
     return response.data;
