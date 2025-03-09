@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import numpy as np
 import joblib
@@ -7,6 +8,7 @@ import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import io
+import shutil
 from io import StringIO, BytesIO
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
@@ -31,6 +33,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount the static directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 class DatasetOverviewResponse(BaseModel):
     num_rows: int
@@ -189,9 +194,9 @@ async def automl_pipeline(
         plt.title("Confusion Matrix")
 
         # Save the plot as a BytesIO object
-        img_bytes = BytesIO()
-        plt.savefig(img_bytes, format="png")
-        img_bytes.seek(0)
+        output_path = "static/confusion_matrix.png"
+        plt.savefig(output_path, format="png", bbox_inches="tight")
+        plt.close()
 
         # Save evaluation report
         report_data = {
@@ -208,7 +213,7 @@ async def automl_pipeline(
         with open("model_report.json", "w") as f:
             json.dump(report_data, f, indent=4)
 
-        return {"report": report_data, "confusion_matrix_image": "confusion_matrix.png"}
+        return {"report": report_data, "confusion_matrix_image": "/static/confusion_matrix.png"}
 
     except Exception as e:
         print(f"ERROR: {str(e)}")
