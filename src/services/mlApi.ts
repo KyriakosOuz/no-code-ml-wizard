@@ -1,4 +1,3 @@
-
 import axios from "axios";
 
 const API_BASE_URL = "https://no-code-ml-wizard-production.up.railway.app";
@@ -8,7 +7,7 @@ export interface UploadParams {
   targetColumn: string;
   missingValueStrategy: string;
   scalingStrategy: string;
-  missingValueSymbol?: string; // Optional to maintain compatibility
+  missingValueSymbol: string; // Changed from optional to required
 }
 
 export interface DatasetOverview {
@@ -73,10 +72,7 @@ export const processAutoML = async (params: UploadParams) => {
     formData.append("target_column", params.targetColumn);
     formData.append("missing_value_strategy", params.missingValueStrategy);
     formData.append("scaling_strategy", params.scalingStrategy);
-    
-    // Use default "?" if missingValueSymbol is not provided
-    const missingValueSymbol = params.missingValueSymbol || "?";
-    formData.append("missing_value_symbol", missingValueSymbol);
+    formData.append("missing_value_symbol", params.missingValueSymbol);
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
