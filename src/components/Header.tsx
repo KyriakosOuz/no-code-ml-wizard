@@ -21,10 +21,10 @@ export default function Header() {
               Dashboard
             </Link>
             <Link
-              to="/model-training"
+              to="/automl"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
-              Model Training
+              AutoML
             </Link>
           </nav>
         </div>
