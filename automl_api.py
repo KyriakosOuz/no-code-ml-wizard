@@ -26,7 +26,7 @@ app = FastAPI()
 # Allow Lovable frontend to access the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://preview--no-code-ml-wizard.lovable.app"],  # Update with your Lovable frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,9 +47,9 @@ async def upload_dataset(file: UploadFile = File(...)):
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
 
         if df.empty:
-            raise ValueError("❌ Dataset is empty after loading.")
+            raise ValueError("Dataset is empty after loading.")
 
-        print(f"✅ Dataset loaded successfully: {df.shape}")
+        print(f"Dataset loaded successfully: {df.shape}")
 
         # Detect column types
         column_details = []
@@ -211,7 +211,7 @@ async def automl_pipeline(
         return {"report": report_data, "confusion_matrix_image": "confusion_matrix.png"}
 
     except Exception as e:
-        print(f"🚨 ERROR: {str(e)}")
+        print(f"ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AutoML pipeline failed: {str(e)}")
 
 
