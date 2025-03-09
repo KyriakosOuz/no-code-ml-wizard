@@ -19,13 +19,14 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from pydantic import BaseModel
+import uvicorn
 
 app = FastAPI()
 
 # Allow Lovable frontend to access the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update with your Lovable frontend URL
+    allow_origins=["https://preview--no-code-ml-wizard.lovable.app"],  # Update with your Lovable frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,9 +47,9 @@ async def upload_dataset(file: UploadFile = File(...)):
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
 
         if df.empty:
-            raise ValueError("Dataset is empty after loading.")
+            raise ValueError("❌ Dataset is empty after loading.")
 
-        print(f"Dataset loaded successfully: {df.shape}")
+        print(f"✅ Dataset loaded successfully: {df.shape}")
 
         # Detect column types
         column_details = []
@@ -128,6 +129,11 @@ async def automl_pipeline(
         label_encoder = LabelEncoder()
         df[target_column] = label_encoder.fit_transform(df[target_column])
 
+        # Check class distribution
+        class_counts = df[target_column].value_counts()
+        if class_counts.min() < 2:
+            raise HTTPException(status_code=400, detail=f"Insufficient samples in class: {class_counts.to_dict()}. Each class must have at least 2 samples.")
+
         # Normalize numerical data
         scaler = StandardScaler() if scaling_strategy == "standard" else MinMaxScaler()
         df[numerical_cols] = scaler.fit_transform(df[numerical_cols])
@@ -137,15 +143,15 @@ async def automl_pipeline(
         y = df[target_column]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-        # Define models
+        # Define models (using fewer models initially)
         models = {
             "Logistic Regression": LogisticRegression(max_iter=500),
-            "Random Forest": RandomForestClassifier(),
-            "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss"),
             "SVM": SVC(probability=True),
             "Naive Bayes": GaussianNB(),
             "KNN": KNeighborsClassifier(),
             "Gradient Boosting": GradientBoostingClassifier(),
+            "Random Forest": RandomForestClassifier(n_jobs=-1),
+            "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss", n_jobs=-1),
         }
 
         best_model = None
@@ -170,7 +176,7 @@ async def automl_pipeline(
         y_pred = best_model_instance.predict(X_test)
         conf_matrix = confusion_matrix(y_test, y_pred)
         class_report = classification_report(y_test, y_pred, output_dict=True)
-        cross_val_scores = cross_val_score(best_model_instance, X, y, cv=5, scoring="accuracy")
+        cross_val_scores = cross_val_score(best_model_instance, X, y, cv=5, scoring="accuracy", n_jobs=-1)
         mean_cv_accuracy = np.mean(cross_val_scores)
         train_acc = best_model_instance.score(X_train, y_train)
         test_acc = best_model_instance.score(X_test, y_test)
@@ -227,3 +233,6 @@ def download_report():
             media_type="application/json",
             headers={"Content-Disposition": "attachment; filename=model_report.json"},
         )
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8080, timeout_keep_alive=120)
