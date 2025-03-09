@@ -2,8 +2,8 @@ fastapi
 uvicorn
 pandas
 numpy
+scikit-learn
+xgboost
 joblib
 matplotlib
 seaborn
-scikit-learn
-xgboost
