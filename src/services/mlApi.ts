@@ -9,6 +9,7 @@ export interface UploadParams {
   missingValueStrategy: string;
   scalingStrategy: string;
   missingValueSymbol?: string; // Optional since we provide a default
+  problemType?: string; // Added to specify classification or regression
 }
 
 export interface DatasetOverview {
@@ -80,7 +81,12 @@ export const processAutoML = async (params: UploadParams) => {
     const missingValueSymbol = params.missingValueSymbol || "?";
     formData.append("missing_value_symbol", missingValueSymbol);
     
+    // Add problem type if specified, default to 'auto' to let the backend detect
+    const problemType = params.problemType || "auto";
+    formData.append("problem_type", problemType);
+    
     console.log("Using missing value symbol:", missingValueSymbol); // Add debugging
+    console.log("Using problem type:", problemType); // Add debugging
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
@@ -92,14 +98,29 @@ export const processAutoML = async (params: UploadParams) => {
     return response.data;
   } catch (error) {
     console.error("Error processing AutoML:", error);
+    
     if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
       throw new Error("Network error: Unable to connect to the ML server. Please check your internet connection and try again.");
     }
-    // Add more detailed error message based on actual API response
+    
+    // Handle specific known errors
     if (axios.isAxiosError(error) && error.response) {
-      const errorDetail = error.response.data?.detail || "Unknown server error";
+      const errorData = error.response.data;
+      console.error("Error response data:", errorData);
+      
+      // Handle specific error about continuous vs categorical target
+      if (errorData?.detail && errorData.detail.includes("Unknown label type: continuous")) {
+        throw new Error(
+          "Dataset error: It appears your target column (Income) contains continuous values, " +
+          "but you're trying to perform a classification task. For numeric target columns, " + 
+          "please use regression instead. You may need to modify the backend to support this."
+        );
+      }
+      
+      const errorDetail = errorData?.detail || "Unknown server error";
       throw new Error(`Failed to process the dataset: ${errorDetail}`);
     }
+    
     throw new Error("Failed to process the dataset. Please check that the target column exists and try again.");
   }
 };
@@ -133,3 +154,4 @@ export const getFeatureImportanceUrl = (): string => {
 export const getPrecisionRecallUrl = (): string => {
   return `${API_BASE_URL}/static/precision_recall.png`;
 };
+
