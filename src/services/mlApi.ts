@@ -9,18 +9,31 @@ export interface UploadParams {
   missingValueStrategy: string;
   scalingStrategy: string;
   missingValueSymbol?: string; // Optional since we provide a default
-  problemType: string; // Required: "classification" or "regression"
+  problemType: string; // Required: "classification" or "regression" or "auto"
 }
 
 export interface DatasetOverview {
   num_rows: number;
   num_columns: number;
   column_details: ColumnDetail[];
+  sample_rows: any[]; // Preview of first 5 rows
+  missing_values_summary: MissingValuesSummary;
+  correlation_matrix: CorrelationMatrix;
+}
+
+export interface MissingValuesSummary {
+  columns: string[];
+  percentages: number[];
+}
+
+export interface CorrelationMatrix {
+  columns: string[];
+  values: number[][];
 }
 
 export interface ColumnDetail {
   name: string;
-  type: "numeric" | "categorical";
+  type: "numeric" | "categorical" | "datetime";
   missing_values: number;
   missing_percent: number;
   stats: NumericStats | CategoricalStats;
@@ -33,11 +46,67 @@ interface NumericStats {
   mean: number;
   std_dev: number;
   median: number;
+  skewness?: number;
+  kurtosis?: number;
+  quartiles?: {
+    "25%": number;
+    "50%": number;
+    "75%": number;
+  };
 }
 
 interface CategoricalStats {
   unique_values: number;
   most_common: string;
+  most_common_count?: number;
+  least_common?: string;
+  least_common_count?: number;
+}
+
+export interface ModelReport {
+  problem_type: string;
+  model_scores: Record<string, number>;
+  best_model: string;
+  best_score: number;
+  model_metrics: ClassificationMetrics | RegressionMetrics;
+  model_comparison: Record<string, ModelComparison>;
+  model_predictions: {
+    test_indices: number[];
+    actual_values: number[] | string[];
+    predictions: Record<string, (number | string)[]>;
+  };
+}
+
+interface ModelComparison {
+  score: number;
+  is_best: boolean;
+}
+
+interface ClassificationMetrics {
+  training_accuracy: number;
+  test_accuracy: number;
+  class_report: any;
+  confusion_matrix: number[][];
+}
+
+interface RegressionMetrics {
+  train_rmse: number;
+  train_r2: number;
+  test_rmse: number;
+  test_r2: number;
+}
+
+export interface ModelResultUrls {
+  report: ModelReport;
+  dataset_url: string;
+  preprocessed_dataset_url: string;
+  confusion_matrix_image?: string;
+  feature_importance_image?: string;
+  precision_recall_image?: string;
+  residual_plot_image?: string;
+  actual_vs_predicted_image?: string;
+  correlation_heatmap?: string;
+  missing_values_chart?: string;
 }
 
 export const uploadDataset = async (file: File): Promise<DatasetOverview> => {
@@ -49,7 +118,7 @@ export const uploadDataset = async (file: File): Promise<DatasetOverview> => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      timeout: 30000, // 30 seconds timeout
+      timeout: 60000, // 60 seconds timeout for dataset analysis
     });
 
     return response.data;
@@ -71,14 +140,14 @@ export const uploadCSV = async (params: Partial<UploadParams>) => {
     missingValueStrategy: params.missingValueStrategy || "median",
     scalingStrategy: params.scalingStrategy || "standard",
     missingValueSymbol: params.missingValueSymbol || "?",
-    problemType: params.problemType || "classification" // Default to classification if not specified
+    problemType: params.problemType || "auto" // Default to auto-detection if not specified
   };
   
   // This is essentially the same as processAutoML but with a different name
   return processAutoML(completeParams);
 };
 
-export const processAutoML = async (params: Partial<UploadParams>) => {
+export const processAutoML = async (params: Partial<UploadParams>): Promise<ModelResultUrls> => {
   try {
     console.log("Processing AutoML with params:", params); // Add debugging
     const formData = new FormData();
@@ -92,7 +161,7 @@ export const processAutoML = async (params: Partial<UploadParams>) => {
     formData.append("missing_value_symbol", missingValueSymbol);
     
     // Explicitly require problem type parameter with a default
-    const problemType = params.problemType || "classification";
+    const problemType = params.problemType || "auto";
     formData.append("problem_type", problemType);
     
     console.log("Using missing value symbol:", missingValueSymbol); // Add debugging
@@ -102,7 +171,7 @@ export const processAutoML = async (params: Partial<UploadParams>) => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      timeout: 120000, // 120 seconds (2 minutes) for model training
+      timeout: 180000, // 3 minutes for model training
     });
 
     return response.data;
@@ -161,14 +230,25 @@ export const downloadReport = (): void => {
   }
 };
 
-export const getConfusionMatrixUrl = (): string => {
-  return `${API_BASE_URL}/static/confusion_matrix.png`;
+export const downloadDataset = (): void => {
+  try {
+    window.open(`${API_BASE_URL}/download-dataset/`);
+  } catch (error) {
+    console.error("Error downloading dataset:", error);
+    throw new Error("Failed to download the dataset. Please try again later.");
+  }
 };
 
-export const getFeatureImportanceUrl = (): string => {
-  return `${API_BASE_URL}/static/feature_importance.png`;
+export const downloadPreprocessedDataset = (): void => {
+  try {
+    window.open(`${API_BASE_URL}/download-preprocessed-dataset/`);
+  } catch (error) {
+    console.error("Error downloading processed dataset:", error);
+    throw new Error("Failed to download the processed dataset. Please try again later.");
+  }
 };
 
-export const getPrecisionRecallUrl = (): string => {
-  return `${API_BASE_URL}/static/precision_recall.png`;
+export const getImageUrl = (imagePath: string | null | undefined): string | undefined => {
+  if (!imagePath) return undefined;
+  return `${API_BASE_URL}${imagePath}`;
 };
