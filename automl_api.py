@@ -77,17 +77,24 @@ async def automl_pipeline(
     file: UploadFile = File(...),
     target_column: str = Form(...),
     algorithm: str = Form(...),
-    hyperparameters: str = Form("{}"),
+    hyperparameters: str = Form("{}"),  # Default to empty JSON object
     missing_value_strategy: str = Form("median"),
     scaling_strategy: str = Form("standard"),
     auto_tune: bool = Form(False),
     generate_visualization: bool = Form(False),
-    missing_value_symbol: str = Form("NaN")  # NEW: Allow user to specify missing values
+    missing_value_symbol: str = Form("NaN")
 ):
     """Handles AutoML training by calling model_training functions."""
     try:
-        # ✅ Convert hyperparameters safely
-        hyperparameters = json.loads(hyperparameters)
+        # ✅ Parse hyperparameters JSON safely
+        try:
+            hyperparameters_dict = json.loads(hyperparameters)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in hyperparameters: {str(e)}")
+
+        print(f"✅ Received Hyperparameters: {hyperparameters_dict}")  # Debugging log
+
+        return {"message": "Dataset processed successfully", "parsed_hyperparameters": hyperparameters_dict}
         
         # ✅ Read dataset, specifying missing values
         missing_values_list = ["NA", "N/A", "None", "null", ""]  # Default missing values
