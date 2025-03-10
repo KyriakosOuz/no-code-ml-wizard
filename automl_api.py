@@ -282,16 +282,19 @@ async def automl_pipeline(
         plt.savefig("static/feature_importance.png", format="png", bbox_inches="tight")
         plt.close()
 
-        # Precision-Recall Curve
-        precision, recall, _ = precision_recall_curve(y_test, best_model_instance.predict_proba(X_test)[:, 1])
-        plt.figure(figsize=(8, 6))
-        plt.plot(recall, precision, marker=".", label=best_model)
-        plt.xlabel("Recall")
-        plt.ylabel("Precision")
-        plt.title("Precision-Recall Curve")
-        pr_curve_img = BytesIO()
-        plt.savefig("static/precision_recall.png", format="png", bbox_inches="tight")
-        plt.close()
+        # Precision-Recall Curve (Only for Binary Classification)
+        if len(set(y_test)) == 2:  # Ensure it's binary classification
+            precision, recall, _ = precision_recall_curve(y_test, best_model_instance.predict_proba(X_test)[:, 1])
+            plt.figure(figsize=(8, 6))
+            plt.plot(recall, precision, marker=".", label=best_model)
+            plt.xlabel("Recall")
+            plt.ylabel("Precision")
+            plt.title("Precision-Recall Curve")
+            pr_curve_img = BytesIO()
+            plt.savefig("static/precision_recall.png", format="png", bbox_inches="tight")
+            plt.close()
+        else:
+            print("Skipping Precision-Recall curve as it is not applicable for multi-class classification.")
 
         # Save evaluation report
         report_data = {
