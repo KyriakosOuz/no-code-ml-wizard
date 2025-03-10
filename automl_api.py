@@ -81,24 +81,41 @@ async def automl_pipeline(
     missing_value_strategy: str = Form("median"),
     scaling_strategy: str = Form("standard"),
     auto_tune: bool = Form(False),
-    generate_visualization: bool = Form(False)
+    generate_visualization: bool = Form(False),
+    missing_value_symbol: str = Form("NaN")  # NEW: Allow user to specify missing values
 ):
     """Handles AutoML training by calling model_training functions."""
     try:
-        contents = await file.read()
-        df = pd.read_csv(io.StringIO(contents.decode("utf-8")), na_values=["?", "NA", "N/A", "None", "null", ""])
+        # ✅ Convert hyperparameters safely
+        hyperparameters = json.loads(hyperparameters)
+        
+        # ✅ Read dataset, specifying missing values
+        missing_values_list = ["NA", "N/A", "None", "null", ""]  # Default missing values
+        if missing_value_symbol.strip():  
+            missing_values_list.append(missing_value_symbol)
+
+        df = pd.read_csv(file.file, na_values=missing_values_list)
 
         if target_column not in df.columns:
-            raise ValueError(f"Target column '{target_column}' not found in dataset.")
+            raise HTTPException(status_code=400, detail=f"Target column '{target_column}' not found in dataset.")
 
-        # Send data to training module
-        result = train_model(df, target_column, algorithm, hyperparameters, missing_value_strategy, scaling_strategy, auto_tune, generate_visualization)
+        print(f"🟢 Missing values detected in columns: {df.isnull().sum()}")  # Debugging info
 
-        return result
+        # ✅ Handle missing values (Example for Median)
+        if missing_value_strategy == "median":
+            for col in df.select_dtypes(include=["int64", "float64"]).columns:
+                df[col].fillna(df[col].median(), inplace=True)
 
+        return {
+            "message": "Dataset processed successfully",
+            "missing_value_symbol_used": missing_value_symbol,
+            "num_missing_values_after_processing": df.isnull().sum().sum(),
+        }
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON in hyperparameters: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AutoML pipeline failed: {str(e)}")
-
 
 if __name__ == "__main__":
     import uvicorn
