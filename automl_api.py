@@ -57,13 +57,13 @@ async def upload_dataset(file: UploadFile = File(...)):
 
         print(f"Dataset loaded successfully: {df.shape}")
 
-        # Detect column types
+        # Detect column types and missing values
         column_details = []
         for col in df.columns:
             col_type = "categorical" if df[col].dtype == "object" else "numeric"
             missing_count = int(df[col].isnull().sum())  # Convert numpy.int64 → int
             missing_percent = round((missing_count / len(df)) * 100, 2)
-            
+
             # Get a sample row with missing value if any
             sample_missing_row = None
             if missing_count > 0:
@@ -97,7 +97,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             # Add sample row only if missing values exist
             if sample_missing_row:
                 column_detail["sample_missing_row"] = sample_missing_row
-                
+            
             column_details.append(column_detail)
 
         return {
