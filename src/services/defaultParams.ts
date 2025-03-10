@@ -9,5 +9,6 @@ export const withDefaultParams = (params: Partial<UploadParams>): UploadParams =
     missingValueStrategy: params.missingValueStrategy || "median",
     scalingStrategy: params.scalingStrategy || "standard",
     missingValueSymbol: params.missingValueSymbol || "?", // Default to "?" if not provided
+    problemType: params.problemType || "classification", // Default to classification if not specified
   };
 };
