@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/NotFound";
 import AutoMLDashboard from "@/components/AutoMLDashboard";
+import CustomAutoML from "@/pages/CustomAutoML";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/" element={<Index />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/automl" element={<AutoMLDashboard />} />
+        <Route path="/custom-automl" element={<CustomAutoML />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

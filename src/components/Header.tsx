@@ -26,6 +26,12 @@ export default function Header() {
             >
               AutoML
             </Link>
+            <Link
+              to="/custom-automl"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              Custom AutoML
+            </Link>
           </nav>
         </div>
         <div className="flex flex-1 items-center space-x-2 justify-end">
