@@ -132,6 +132,13 @@ export default function AutoMLDashboard() {
           <p><span className="font-medium">Mean:</span> {stats.mean?.toFixed(2) ?? 'N/A'}</p>
           <p><span className="font-medium">Median:</span> {stats.median?.toFixed(2) ?? 'N/A'}</p>
           <p><span className="font-medium">Std Dev:</span> {stats.std_dev?.toFixed(2) ?? 'N/A'}</p>
+          
+          {column.sample_missing_row && (
+            <div className="col-span-2 bg-red-50 text-red-600 p-2 rounded-md mt-2">
+              <p><strong>Example Row with Missing Value:</strong></p>
+              <pre className="text-xs whitespace-pre-wrap">{column.sample_missing_row}</pre>
+            </div>
+          )}
         </div>
       );
     } else {
@@ -140,10 +147,17 @@ export default function AutoMLDashboard() {
         <div className="text-sm">
           <p><span className="font-medium">Unique Values:</span> {stats.unique_values}</p>
           <p><span className="font-medium">Most Common:</span> {stats.most_common}</p>
+  
+          {column.sample_missing_row && (
+            <div className="bg-red-50 text-red-600 p-2 rounded-md mt-2">
+              <p><strong>Example Row with Missing Value:</strong></p>
+              <pre className="text-xs whitespace-pre-wrap">{column.sample_missing_row}</pre>
+            </div>
+          )}
         </div>
       );
     }
-  };
+  };  
 
   return (
     <div className="container mx-auto p-6 space-y-6">
