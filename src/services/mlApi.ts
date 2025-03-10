@@ -9,7 +9,7 @@ export interface UploadParams {
   missingValueStrategy: string;
   scalingStrategy: string;
   missingValueSymbol?: string; // Optional since we provide a default
-  problemType?: string; // Added to specify classification or regression
+  problemType: string; // Required: "classification" or "regression"
 }
 
 export interface DatasetOverview {
@@ -81,12 +81,11 @@ export const processAutoML = async (params: UploadParams) => {
     const missingValueSymbol = params.missingValueSymbol || "?";
     formData.append("missing_value_symbol", missingValueSymbol);
     
-    // Add problem type if specified, default to 'auto' to let the backend detect
-    const problemType = params.problemType || "auto";
-    formData.append("problem_type", problemType);
+    // Explicitly require problem type parameter - no more defaulting to "auto"
+    formData.append("problem_type", params.problemType);
     
     console.log("Using missing value symbol:", missingValueSymbol); // Add debugging
-    console.log("Using problem type:", problemType); // Add debugging
+    console.log("Using problem type:", params.problemType); // Add debugging
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
@@ -109,12 +108,20 @@ export const processAutoML = async (params: UploadParams) => {
       console.error("Error response data:", errorData);
       
       // Handle specific error about continuous vs categorical target
-      if (errorData?.detail && errorData.detail.includes("Unknown label type: continuous")) {
-        throw new Error(
-          "Dataset error: It appears your target column (Income) contains continuous values, " +
-          "but you're trying to perform a classification task. For numeric target columns, " + 
-          "please use regression instead. You may need to modify the backend to support this."
-        );
+      if (errorData?.detail && typeof errorData.detail === 'string') {
+        if (errorData.detail.includes("Unknown label type: continuous")) {
+          throw new Error(
+            "Dataset error: It appears your target column contains continuous values, " +
+            "but you're trying to perform a classification task. For numeric target columns, " + 
+            "please use regression instead."
+          );
+        } else if (errorData.detail.includes("Classification metrics are not defined for regression")) {
+          throw new Error(
+            "Dataset error: It appears your target column contains discrete values, " +
+            "but you're trying to perform a regression task. For categorical target columns, " + 
+            "please use classification instead."
+          );
+        }
       }
       
       const errorDetail = errorData?.detail || "Unknown server error";
@@ -154,4 +161,3 @@ export const getFeatureImportanceUrl = (): string => {
 export const getPrecisionRecallUrl = (): string => {
   return `${API_BASE_URL}/static/precision_recall.png`;
 };
-
