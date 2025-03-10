@@ -120,45 +120,39 @@ async def automl_pipeline(
     scaling_strategy: str = Form("standard"),
 ):
     try:
-        # Log received parameters for debugging
-        print(f"Received parameters: target={target_column}, missing_symbol={missing_value_symbol}, strategy={missing_value_strategy}")
-        
         # Load dataset and handle missing value symbol
         contents = await file.read()
         missing_values_list = ["NA", "N/A", "None", "null", ""]
-        if missing_value_symbol and missing_value_symbol.strip():  # Ensure it's not an empty string
+        if missing_value_symbol and missing_value_symbol.strip():
             missing_values_list.append(missing_value_symbol)
-            
-        print(f"Using missing values list: {missing_values_list}")
-        
+
         df = pd.read_csv(StringIO(contents.decode("utf-8")), na_values=missing_values_list)
-        print(f"Missing values in dataframe after load: {df.isnull().sum().sum()}")
 
         if target_column not in df.columns:
             raise ValueError(f"Target column '{target_column}' not found in dataset.")
 
-        print(f"Data loaded: {df.shape}")
+        # Detect problem type (Regression vs. Classification)
+        if df[target_column].dtype in ["int64", "float64"]:
+            problem_type = "regression"
+        else:
+            problem_type = "classification"
+
+        print(f"Detected problem type: {problem_type}")
 
         # Detect categorical and numerical columns
         categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
         numerical_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
-        
-        print(f"Categorical columns: {categorical_cols}")
-        print(f"Numerical columns: {numerical_cols}")
-        print(f"Missing values before handling: {df.isnull().sum().sum()}")
 
         # Handle missing values
         if missing_value_strategy == "mean":
             imputer = SimpleImputer(strategy="mean")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
-            # Also handle categorical columns
             for col in categorical_cols:
                 df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
         elif missing_value_strategy == "median":
             imputer = SimpleImputer(strategy="median")
             df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
-            # Also handle categorical columns
             for col in categorical_cols:
                 df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
@@ -169,13 +163,10 @@ async def automl_pipeline(
                 df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "Unknown")
 
         elif missing_value_strategy == "hot_deck":
-            # Hot Deck Imputation for Numerical Columns
             for col in numerical_cols:
                 missing_count = df[col].isnull().sum()
                 if missing_count > 0:
                     df.loc[df[col].isnull(), col] = df[col].dropna().sample(n=missing_count, replace=True, random_state=42).values
-
-            # Hot Deck Imputation for Categorical Columns
             for col in categorical_cols:
                 missing_count = df[col].isnull().sum()
                 if missing_count > 0:
@@ -183,37 +174,17 @@ async def automl_pipeline(
 
         elif missing_value_strategy == "remove":
             df.dropna(inplace=True)
-            
-        print(f"Missing values after handling: {df.isnull().sum().sum()}")
-        
-        # Verify no NaN values remain
-        if df.isnull().sum().sum() > 0:
-            print("WARNING: NaN values still present after imputation!")
-            columns_with_nan = df.columns[df.isna().any()].tolist()
-            print(f"Columns with NaN: {columns_with_nan}")
-            
-            # Force a second pass of imputation for any remaining NaNs
-            for col in df.columns:
-                if df[col].isnull().sum() > 0:
-                    if col in numerical_cols:
-                        df[col] = df[col].fillna(df[col].median() if not df[col].median() is np.nan else 0)
-                    else:
-                        df[col] = df[col].fillna("Unknown")
 
         # Encode categorical features
         for col in categorical_cols:
-            if col != target_column:  # Don't encode the target column yet
+            if col != target_column:
                 le = LabelEncoder()
                 df[col] = le.fit_transform(df[col])
 
-        # Encode categorical target variable
-        label_encoder = LabelEncoder()
-        df[target_column] = label_encoder.fit_transform(df[target_column])
-
-        # Check class distribution
-        class_counts = df[target_column].value_counts()
-        if class_counts.min() < 2:
-            raise HTTPException(status_code=400, detail=f"Insufficient samples in class: {class_counts.to_dict()}. Each class must have at least 2 samples.")
+        # Encode categorical target variable if classification
+        if problem_type == "classification":
+            label_encoder = LabelEncoder()
+            df[target_column] = label_encoder.fit_transform(df[target_column])
 
         # Normalize numerical data
         scaler = StandardScaler() if scaling_strategy == "standard" else MinMaxScaler()
@@ -222,31 +193,44 @@ async def automl_pipeline(
         # Split dataset
         X = df.drop(columns=[target_column])
         y = df[target_column]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Define models (using fewer models initially)
-        models = {
-            "Logistic Regression": LogisticRegression(max_iter=500),
-            "SVM": SVC(probability=True),
-            "Naive Bayes": GaussianNB(),
-            "KNN": KNeighborsClassifier(),
-            "Gradient Boosting": GradientBoostingClassifier(),
-            "Random Forest": RandomForestClassifier(n_jobs=-1),
-            "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss", n_jobs=-1),
-        }
+        # Define models for classification & regression
+        if problem_type == "classification":
+            models = {
+                "Logistic Regression": LogisticRegression(max_iter=500),
+                "SVM": SVC(probability=True),
+                "Naive Bayes": GaussianNB(),
+                "KNN": KNeighborsClassifier(),
+                "Gradient Boosting": GradientBoostingClassifier(),
+                "Random Forest": RandomForestClassifier(n_jobs=-1),
+                "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss", n_jobs=-1),
+            }
+        else:
+            models = {
+                "Linear Regression": LogisticRegression(),
+                "Random Forest Regressor": RandomForestClassifier(n_jobs=-1),
+                "Gradient Boosting Regressor": GradientBoostingClassifier(),
+                "XGBoost Regressor": XGBClassifier(use_label_encoder=False, eval_metric="rmse", n_jobs=-1),
+            }
 
         best_model = None
-        best_accuracy = 0
+        best_score = float('-inf') if problem_type == "regression" else 0
         results = {}
 
         # Train models
         for name, model in models.items():
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            results[name] = accuracy
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
+
+            if problem_type == "classification":
+                score = accuracy_score(y_test, y_pred)
+            else:
+                score = -np.mean(cross_val_score(model, X, y, cv=5, scoring="neg_root_mean_squared_error"))
+
+            results[name] = score
+            if (problem_type == "classification" and score > best_score) or (problem_type == "regression" and score < best_score):
+                best_score = score
                 best_model = name
                 best_model_instance = model
 
@@ -255,67 +239,35 @@ async def automl_pipeline(
 
         # Generate Evaluation Metrics
         y_pred = best_model_instance.predict(X_test)
-        conf_matrix = confusion_matrix(y_test, y_pred)
-        class_report = classification_report(y_test, y_pred, output_dict=True)
-        cross_val_scores = cross_val_score(best_model_instance, X, y, cv=5, scoring="accuracy", n_jobs=-1)
-        mean_cv_accuracy = np.mean(cross_val_scores)
-        train_acc = best_model_instance.score(X_train, y_train)
-        test_acc = best_model_instance.score(X_test, y_test)
 
-        # Generate confusion matrix plot
-        plt.figure(figsize=(10, 7))
-        sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues")
-        plt.xlabel("Predicted")
-        plt.ylabel("Actual")
-        plt.title("Confusion Matrix")
-
-        # Save the plot as a BytesIO object
-        output_path = "static/confusion_matrix.png"
-        plt.savefig(output_path, format="png", bbox_inches="tight")
-        plt.close()
-
-        # Feature Importance
-        plt.figure(figsize=(10, 5))
-        sns.barplot(x=best_model_instance.feature_importances_, y=X.columns)
-        plt.title("Feature Importance")
-        feature_importance_img = BytesIO()
-        plt.savefig("static/feature_importance.png", format="png", bbox_inches="tight")
-        plt.close()
-
-        # Precision-Recall Curve (Only for Binary Classification)
-        if len(set(y_test)) == 2:  # Ensure it's binary classification
-            precision, recall, _ = precision_recall_curve(y_test, best_model_instance.predict_proba(X_test)[:, 1])
-            plt.figure(figsize=(8, 6))
-            plt.plot(recall, precision, marker=".", label=best_model)
-            plt.xlabel("Recall")
-            plt.ylabel("Precision")
-            plt.title("Precision-Recall Curve")
-            pr_curve_img = BytesIO()
-            plt.savefig("static/precision_recall.png", format="png", bbox_inches="tight")
-            plt.close()
+        if problem_type == "classification":
+            conf_matrix = confusion_matrix(y_test, y_pred)
+            class_report = classification_report(y_test, y_pred, output_dict=True)
+            train_acc = best_model_instance.score(X_train, y_train)
+            test_acc = best_model_instance.score(X_test, y_test)
         else:
-            print("Skipping Precision-Recall curve as it is not applicable for multi-class classification.")
+            conf_matrix = None
+            class_report = None
+            train_acc = best_model_instance.score(X_train, y_train)
+            test_acc = best_model_instance.score(X_test, y_test)
 
         # Save evaluation report
         report_data = {
-            "model_accuracies": results,
+            "problem_type": problem_type,
+            "model_scores": results,
             "best_model": best_model,
-            "best_accuracy": best_accuracy,
-            "confusion_matrix": conf_matrix.tolist(),
+            "best_score": best_score,
+            "confusion_matrix": conf_matrix.tolist() if conf_matrix is not None else None,
             "classification_report": class_report,
-            "cross_validation_scores": cross_val_scores.tolist(),
-            "mean_cross_validation_accuracy": mean_cv_accuracy,
-            "training_accuracy": train_acc,
-            "test_accuracy": test_acc,
+            "training_score": train_acc,
+            "test_score": test_acc,
         }
         with open("model_report.json", "w") as f:
             json.dump(report_data, f, indent=4)
 
         return {
             "report": report_data,
-            "confusion_matrix_image": "/static/confusion_matrix.png",
-            "feature_importance_image": "/static/feature_importance.png",
-            "precision_recall_image": "/static/precision_recall.png"
+            "confusion_matrix_image": "/static/confusion_matrix.png" if conf_matrix is not None else None
         }
 
     except Exception as e:
