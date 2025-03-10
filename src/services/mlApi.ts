@@ -63,29 +63,40 @@ export const uploadDataset = async (file: File): Promise<DatasetOverview> => {
 };
 
 // Add the uploadCSV function that ModelTraining is expecting to use
-export const uploadCSV = async (params: UploadParams) => {
+export const uploadCSV = async (params: Partial<UploadParams>) => {
+  // Ensure problemType is set with a default value if missing
+  const completeParams: UploadParams = {
+    file: params.file as File,
+    targetColumn: params.targetColumn || "",
+    missingValueStrategy: params.missingValueStrategy || "median",
+    scalingStrategy: params.scalingStrategy || "standard",
+    missingValueSymbol: params.missingValueSymbol || "?",
+    problemType: params.problemType || "classification" // Default to classification if not specified
+  };
+  
   // This is essentially the same as processAutoML but with a different name
-  return processAutoML(params);
+  return processAutoML(completeParams);
 };
 
-export const processAutoML = async (params: UploadParams) => {
+export const processAutoML = async (params: Partial<UploadParams>) => {
   try {
     console.log("Processing AutoML with params:", params); // Add debugging
     const formData = new FormData();
-    formData.append("file", params.file);
-    formData.append("target_column", params.targetColumn);
-    formData.append("missing_value_strategy", params.missingValueStrategy);
-    formData.append("scaling_strategy", params.scalingStrategy);
+    formData.append("file", params.file as File);
+    formData.append("target_column", params.targetColumn || "");
+    formData.append("missing_value_strategy", params.missingValueStrategy || "median");
+    formData.append("scaling_strategy", params.scalingStrategy || "standard");
     
     // Ensure missing value symbol is explicitly set and not undefined
     const missingValueSymbol = params.missingValueSymbol || "?";
     formData.append("missing_value_symbol", missingValueSymbol);
     
-    // Explicitly require problem type parameter - no more defaulting to "auto"
-    formData.append("problem_type", params.problemType);
+    // Explicitly require problem type parameter with a default
+    const problemType = params.problemType || "classification";
+    formData.append("problem_type", problemType);
     
     console.log("Using missing value symbol:", missingValueSymbol); // Add debugging
-    console.log("Using problem type:", params.problemType); // Add debugging
+    console.log("Using problem type:", problemType); // Add debugging
 
     const response = await axios.post(`${API_BASE_URL}/automl/`, formData, {
       headers: {
