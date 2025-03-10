@@ -50,7 +50,7 @@ export default function AutoMLDashboard() {
   const [targetColumn, setTargetColumn] = useState<string>("");
   const [missingStrategy, setMissingStrategy] = useState<string>("median");
   const [scalingStrategy, setScalingStrategy] = useState<string>("standard");
-  const [missingValueSymbol, setMissingValueSymbol] = useState<string>("");
+  const [missingValueSymbol, setMissingValueSymbol] = useState<string>("?");
   
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<any>(null);
@@ -253,13 +253,14 @@ export default function AutoMLDashboard() {
                           </div>
                           
                           <div className="space-y-2">
-                            <Label htmlFor="missing-symbol">Missing Value Symbol</Label>
+                            <Label htmlFor="missing-value-symbol">Missing Value Symbol</Label>
                             <Input
-                              id="missing-symbol"
+                              id="missing-value-symbol"
                               type="text"
-                              placeholder="Enter symbol (e.g., ?, -, NaN, etc.)"
+                              placeholder="e.g., ?, NA, null"
                               value={missingValueSymbol}
                               onChange={(e) => setMissingValueSymbol(e.target.value)}
+                              className="w-full"
                             />
                           </div>
                           
